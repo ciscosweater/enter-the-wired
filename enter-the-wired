@@ -1,0 +1,480 @@
+#!/bin/bash
+set -euo pipefail
+
+# ENTER THE WIRED
+# "I am here. But where is here? And where is here within here?"
+
+# Colors (disabled if not interactive terminal)
+if [ -t 1 ] && [ -t 0 ]; then
+    GREEN='\033[0;32m'
+    RED='\033[0;31m'
+    YELLOW='\033[1;33m'
+    NC='\033[0m'
+else
+    GREEN=''
+    RED=''
+    YELLOW=''
+    NC=''
+fi
+
+echo -e "${GREEN}Scanning environment for installation (Python + Pip + SDL2)...${NC}"
+
+if [ ! -f /etc/os-release ]; then
+    echo -e "${RED}Error: /etc/os-release not found.${NC}"
+    exit 1
+fi
+
+source /etc/os-release
+
+# ACCELA URL (hosted on catbox.moe)
+ACCELA_URL="https://files.catbox.moe/qdkift.gz"
+TEMP_ARCHIVE="accela_source.tar.gz"
+INSTALL_DIR="$HOME/accela"
+
+PKG_MANAGER=""
+INSTALL_CMD=""
+PACKAGE_LIST=""
+NEEDS_UPDATE=false
+
+# Function to detect distribution family
+detect_distro_family() {
+    # Priority: direct ID > ID_LIKE > specific files
+    # Use default empty string if ID_LIKE is not set
+    ID_LIKE="${ID_LIKE:-}"
+
+    # Fedora/RHEL/CentOS
+    if [[ "$ID" == "fedora" || "$ID" == "rhel" || "$ID" == "centos" || \
+          "$ID_LIKE" =~ "fedora" || "$ID_LIKE" =~ "rhel" ]]; then
+        echo "fedora"
+        return 0
+    fi
+
+    # Debian/Ubuntu
+    if [[ "$ID" == "debian" || "$ID" == "ubuntu" || \
+          "$ID_LIKE" =~ "debian" || "$ID_LIKE" =~ "ubuntu" ]]; then
+        echo "debian"
+        return 0
+    fi
+
+    # Arch Linux (includes derivatives like CachyOS, Manjaro, EndeavourOS)
+    if [[ "$ID" == "arch" || "$ID_LIKE" =~ "arch" ]] || \
+       [ -f "/etc/arch-release" ]; then
+        echo "arch"
+        return 0
+    fi
+
+    return 1
+}
+
+# Detect and configure distribution family
+FAMILY=$(detect_distro_family)
+
+if [ -z "$FAMILY" ]; then
+    echo -e "${RED}Error: Could not detect distribution family.${NC}"
+    echo "ID=$ID, ID_LIKE=$ID_LIKE"
+    exit 1
+fi
+
+case "$FAMILY" in
+    fedora)
+        echo "Detected system: Fedora family"
+        PKG_MANAGER="dnf"
+        INSTALL_CMD="sudo dnf install -y"
+        PACKAGE_LIST="python3 python3-pip python3-devel SDL2-devel gcc SDL2_mixer-devel SDL2_image-devel SDL2_ttf-devel"
+        ;;
+    debian)
+        echo "Detected system: Debian/Ubuntu family"
+        PKG_MANAGER="apt"
+        INSTALL_CMD="sudo apt install -y"
+        NEEDS_UPDATE=true
+        PACKAGE_LIST="python3 python3-pip python3-dev libsdl2-dev build-essential libsdl2-mixer-dev libsdl2-image-dev libsdl2-ttf-dev libxcb-cursor0 libcurl4-openssl-dev"
+        ;;
+    arch)
+        echo "Detected system: Arch Linux family"
+        PKG_MANAGER="pacman"
+        INSTALL_CMD="sudo pacman -Sy --noconfirm"
+        PACKAGE_LIST="python python-pip sdl2 gcc sdl2_image sdl2_ttf libxcb curl"
+        ;;
+    *)
+        echo -e "${RED}Distribution '$NAME' not automatically supported.${NC}"
+        echo ""
+        echo "Please install dependencies manually:"
+        echo "  - Python 3.x with pip"
+        echo "  - SDL2 (libsdl2-dev)"
+        echo "  - SDL2 Mixer (libsdl2-mixer-dev)"
+        echo "  - SDL2 Image (libsdl2-image-dev)"
+        echo "  - SDL2 TTF (libsdl2-ttf-dev)"
+        echo "  - GCC/G++"
+        exit 1
+        ;;
+esac
+
+# Execution
+echo -e "Package manager: ${GREEN}$PKG_MANAGER${NC}"
+echo -e "Packages to install: ${GREEN}$PACKAGE_LIST${NC}"
+
+# Extra step for Debian/Ubuntu
+if [ "$NEEDS_UPDATE" = true ]; then
+    echo "Updating repository lists..."
+    sudo apt update
+fi
+
+# Single installation command
+echo "Starting installation..."
+$INSTALL_CMD $PACKAGE_LIST
+
+if [ $? -eq 0 ]; then
+    echo -e "${GREEN}Success! All dependencies installed.${NC}"
+else
+    echo -e "${RED}Installation failed.${NC}"
+    exit 1
+fi
+
+echo -e "${GREEN}Installing ACCELA...${NC}"
+
+# Cleanup to avoid conflicts with previous installation attempts
+rm -rf ACCELA-*-linux-source "$TEMP_ARCHIVE"
+
+
+echo "Downloading ACCELA..."
+if ! curl -L -o "$TEMP_ARCHIVE" "$ACCELA_URL"; then
+    echo -e "${RED}Download error. Check URL or connection.${NC}"
+    rm -f "$TEMP_ARCHIVE" 2>/dev/null
+    exit 1
+fi
+
+# Verify download was successful (minimum 1KB)
+if [ ! -f "$TEMP_ARCHIVE" ]; then
+    echo -e "${RED}Error: Download failed or file is empty.${NC}"
+    rm -f "$TEMP_ARCHIVE" 2>/dev/null
+    exit 1
+fi
+
+# Get file size with portable stat syntax
+FILE_SIZE=$(stat -c%s "$TEMP_ARCHIVE" 2>/dev/null || stat -f%z "$TEMP_ARCHIVE" 2>/dev/null || echo 0)
+if [ "$FILE_SIZE" -lt 1024 ]; then
+    echo -e "${RED}Error: Downloaded file is too small (corrupted).${NC}"
+    rm -f "$TEMP_ARCHIVE" 2>/dev/null
+    exit 1
+fi
+
+mkdir -p "$INSTALL_DIR"
+
+echo "Extracting archive..."
+if ! tar -xzf "$TEMP_ARCHIVE" -C "$INSTALL_DIR"; then
+    echo -e "${RED}Error extracting archive. Download may be corrupted.${NC}"
+    rm -f "$TEMP_ARCHIVE" 2>/dev/null
+    exit 1
+fi
+rm "$TEMP_ARCHIVE"
+
+if ! cd "$INSTALL_DIR"; then
+    echo -e "${RED}Error: Could not access $INSTALL_DIR${NC}"
+    exit 1
+fi
+
+echo "Making installer executable..."
+if [ -f "./ACCELAINSTALL" ]; then
+    chmod +x ./ACCELAINSTALL
+
+    echo -e "${GREEN}Running ACCELAINSTALL...${NC}"
+    export SKIPVENV="${SKIPVENV:-0}"
+    if ! ./ACCELAINSTALL; then
+        echo -e "${RED}Error running ACCELAINSTALL.${NC}"
+        exit 1
+    fi
+else
+    echo -e "${RED}Error: 'ACCELAINSTALL' not found in extracted folder.${NC}"
+    ls -la
+    exit 1
+fi
+
+
+# Install required libraries for ACCELA
+ACCELA_DIR="$HOME/.local/share/ACCELA"
+
+if [ ! -d "$ACCELA_DIR" ]; then
+    echo -e "${RED}Error: ACCELA directory not found at $ACCELA_DIR${NC}"
+    echo "ACCELAINSTALL may have failed."
+    exit 1
+fi
+
+cd "$ACCELA_DIR"
+
+if [ ! -d ".venv" ]; then
+    echo -e "${RED}Error: Virtualenv not found.${NC}"
+    exit 1
+fi
+
+source ./.venv/bin/activate
+
+# CC=gcc CXX=g++ override pygame's requirement for "gcc-12"
+echo "Installing Python dependencies..."
+if ! CC=gcc CXX=g++ pip install --no-cache-dir --force-reinstall -r "$ACCELA_DIR/requirements.txt"; then
+    echo -e "${RED}Error installing Python dependencies.${NC}"
+    exit 1
+fi
+
+echo -e "${GREEN}Dependencies installed successfully!${NC}"
+
+# Clean up installer directory only if everything succeeded
+echo "Cleaning up temporary files..."
+rm -rf "$INSTALL_DIR"
+
+# ============================================================
+# SLSSTEAM INSTALLATION FUNCTION
+# ============================================================
+
+install_slssteam() {
+    echo -e "${GREEN}Installing SLSsteam...${NC}"
+
+    # Variables
+    SLSSTEAM_INSTALL_DIR="$HOME/.local/share/SLSsteam"
+    SLSSTEAM_CONFIG_DIR="$HOME/.config/SLSsteam"
+    STEAM_DIR="$HOME/.steam/steam"
+    TEMP_SLS="/tmp/slssteam.7z"
+
+    # Check if 7z is installed
+    if ! command -v 7z >/dev/null 2>&1 && ! command -v 7za >/dev/null 2>&1; then
+        echo "Installing p7zip..."
+        if ! case "$FAMILY" in
+            fedora) sudo dnf install -y p7zip p7zip-plugins ;;
+            debian) sudo apt install -y p7zip-full ;;
+            arch)   sudo pacman -Sy --noconfirm p7zip ;;
+        esac; then
+            echo -e "${RED}Error installing p7zip.${NC}"
+            return 1
+        fi
+    fi
+
+    # Check if wget is installed
+    if ! command -v wget >/dev/null 2>&1; then
+        echo "Installing wget..."
+        if ! case "$FAMILY" in
+            fedora) sudo dnf install -y wget ;;
+            debian) sudo apt install -y wget ;;
+            arch)   sudo pacman -Sy --noconfirm wget ;;
+        esac; then
+            echo -e "${RED}Error installing wget.${NC}"
+            return 1
+        fi
+    fi
+
+    # Check if Steam is installed
+    if [ ! -d "$STEAM_DIR" ]; then
+        echo -e "${RED}Steam not found at $STEAM_DIR${NC}"
+        echo "Please install Steam first."
+        return 1
+    fi
+
+    # Close Steam if running (try multiple methods)
+    STEAM_PID=$(pgrep -x "steam" 2>/dev/null || true)
+    if [ -n "$STEAM_PID" ]; then
+        echo "Closing Steam..."
+        # Try steam protocol first
+        steam steam://exit 2>/dev/null || true
+        # Also try SIGTERM for robustness
+        for pid in $STEAM_PID; do
+            kill -TERM "$pid" 2>/dev/null || true
+        done
+        # Wait for graceful shutdown
+        for i in 1 2 3; do
+            sleep 1
+            STEAM_PID=$(pgrep -x "steam" 2>/dev/null || true)
+            [ -z "$STEAM_PID" ] && break
+        done
+        # Force kill if still running
+        STEAM_PID=$(pgrep -x "steam" 2>/dev/null || true)
+        if [ -n "$STEAM_PID" ]; then
+            echo "Force closing Steam..."
+            for pid in $STEAM_PID; do
+                kill -9 "$pid" 2>/dev/null || true
+            done
+        fi
+    fi
+
+    # Create directories
+    mkdir -p "$SLSSTEAM_INSTALL_DIR"
+    mkdir -p "$SLSSTEAM_CONFIG_DIR"
+
+    # Backup existing config
+    if [ -f "$SLSSTEAM_CONFIG_DIR/config.yaml" ]; then
+        cp "$SLSSTEAM_CONFIG_DIR/config.yaml" "$SLSSTEAM_CONFIG_DIR/config.yaml.bak"
+        echo "Config backup created."
+    fi
+
+    # Download latest SLSsteam release
+    echo "Downloading SLSsteam..."
+    # Get release data from GitHub API
+    RELEASE_JSON=$(curl -s "https://api.github.com/repos/AceSLS/SLSsteam/releases/latest")
+
+    if [ -z "$RELEASE_JSON" ] || echo "$RELEASE_JSON" | grep -q '"message":'; then
+        echo -e "${RED}Error fetching SLSsteam release info.${NC}"
+        return 1
+    fi
+
+    # Extract download URL using grep with more specific pattern
+    LATEST_URL=$(echo "$RELEASE_JSON" | grep -o '"browser_download_url": *"[^"]*SLSsteam-Any\.7z"' | \
+                 sed 's/"browser_download_url": *"\([^"]*\)"/\1/' | head -1)
+
+    if [ -z "$LATEST_URL" ]; then
+        echo -e "${RED}Error: Could not find SLSsteam-Any.7z in release assets.${NC}"
+        return 1
+    fi
+
+    if ! wget -q -O "$TEMP_SLS" "$LATEST_URL"; then
+        echo -e "${RED}Error downloading SLSsteam.${NC}"
+        rm -f "$TEMP_SLS"
+        return 1
+    fi
+
+    # Extract and install
+    echo "Extracting SLSsteam..."
+    rm -rf /tmp/slssteam_extract
+    mkdir -p /tmp/slssteam_extract
+
+    if ! 7z x "$TEMP_SLS" -o/tmp/slssteam_extract -y 2>&1 | tail -5; then
+        echo -e "${RED}Error extracting archive.${NC}"
+        rm -rf /tmp/slssteam_extract "$TEMP_SLS"
+        return 1
+    fi
+
+    # Find SLSsteam.so in any subdirectory
+    SLSSTEAM_SO=$(find /tmp/slssteam_extract -name "SLSsteam.so" -type f 2>/dev/null | head -1)
+
+    if [ -z "$SLSSTEAM_SO" ]; then
+        echo -e "${RED}Error: SLSsteam.so not found in archive.${NC}"
+        echo "Archive contents:"
+        find /tmp/slssteam_extract -type f 2>/dev/null | head -20
+        rm -rf /tmp/slssteam_extract "$TEMP_SLS"
+        return 1
+    fi
+
+    echo "Found SLSsteam.so at: $SLSSTEAM_SO"
+
+    # Copy library
+    cp "$SLSSTEAM_SO" "$SLSSTEAM_INSTALL_DIR/"
+    rm -rf /tmp/slssteam_extract "$TEMP_SLS"
+
+    # Configure SLSsteam (only if missing PlayNotOwnedGames)
+    if [ ! -f "$SLSSTEAM_CONFIG_DIR/config.yaml" ]; then
+        cat > "$SLSSTEAM_CONFIG_DIR/config.yaml" << 'EOF'
+# SLSsteam Configuration
+PlayNotOwnedGames: yes
+EOF
+        echo "config.yaml created."
+    else
+        if ! grep -q "PlayNotOwnedGames" "$SLSSTEAM_CONFIG_DIR/config.yaml"; then
+            echo "PlayNotOwnedGames: yes" >> "$SLSSTEAM_CONFIG_DIR/config.yaml"
+            echo "config.yaml updated."
+        else
+            echo "config.yaml already contains PlayNotOwnedGames."
+        fi
+    fi
+
+    # Patch steam.sh
+    STEAM_SH="$STEAM_DIR/steam.sh"
+    if [ -f "$STEAM_SH" ]; then
+        echo "Patching steam.sh..."
+
+        # Check if already patched (avoid duplicates)
+        if grep -q "LD_AUDIT.*SLSsteam.so" "$STEAM_SH" 2>/dev/null; then
+            echo "steam.sh already patched with SLSsteam."
+        else
+            # Backup
+            cp "$STEAM_SH" "$STEAM_SH.bak"
+
+            # Find line with SESSION_ROOT export and add after it
+            SESSION_LINE=$(grep -n 'export SESSION_ROOT' "$STEAM_SH" | head -1 | cut -d: -f1)
+            if [ -n "$SESSION_LINE" ]; then
+                sed -i "${SESSION_LINE}a\\
+export LD_AUDIT=\"$SLSSTEAM_INSTALL_DIR/SLSsteam.so\"" "$STEAM_SH"
+                echo "Patch applied after SESSION_ROOT."
+            else
+                # Fallback: add at the beginning of the file after shebang if any
+                if head -1 "$STEAM_SH" | grep -q '^#!'; then
+                    sed -i '1a\
+export LD_AUDIT="'"$SLSSTEAM_INSTALL_DIR"'/SLSsteam.so"' "$STEAM_SH"
+                    echo "Patch applied after shebang (SESSION_ROOT not found)."
+                else
+                    echo -e "${YELLOW}Warning: Could not find insertion point for patch.${NC}"
+                fi
+            fi
+        fi
+    else
+        echo -e "${RED}Warning: steam.sh not found at $STEAM_SH${NC}"
+    fi
+
+    # Create libcurl symlink (required for SLSsteam)
+    STEAM_LIB_DIR="$STEAM_DIR/ubuntu12_32"
+    mkdir -p "$STEAM_LIB_DIR"
+
+    # Find correct libcurl path
+    CURL_LIB=""
+    case "$FAMILY" in
+        fedora)
+            if [ -f /usr/lib64/libcurl.so.4 ]; then
+                CURL_LIB="/usr/lib64/libcurl.so.4"
+            fi
+            ;;
+        debian)
+            if [ -f /usr/lib/x86_64-linux-gnu/libcurl.so.4 ]; then
+                CURL_LIB="/usr/lib/x86_64-linux-gnu/libcurl.so.4"
+            fi
+            ;;
+        arch)
+            if [ -f /usr/lib/libcurl.so.4 ]; then
+                CURL_LIB="/usr/lib/libcurl.so.4"
+            else
+                CURL_LIB=$(find /usr/lib -name 'libcurl.so*' 2>/dev/null | head -1 || true)
+            fi
+            ;;
+    esac
+
+    if [ -n "$CURL_LIB" ] && [ -f "$CURL_LIB" ]; then
+        rm -f "$STEAM_LIB_DIR/libcurl.so.4"
+        ln -sf "$CURL_LIB" "$STEAM_LIB_DIR/libcurl.so.4"
+        echo "libcurl.so.4 symlink created."
+    else
+        echo -e "${YELLOW}Warning: libcurl not found. SLSsteam may not work correctly.${NC}"
+    fi
+
+    echo -e "${GREEN}SLSsteam installed successfully!${NC}"
+    echo "Just open Steam normally to play."
+}
+
+# ============================================================
+# SLSSTEAM PROMPT
+# ============================================================
+
+install_slssteam_ask() {
+    echo ""
+    echo -e "${GREEN}Would you like to install SLSsteam as well?${NC}"
+    echo "SLSsteam is a modification that allows playing games not owned in your library."
+    echo ""
+    echo "  [y] Yes, install"
+    echo "  [n] No, skip"
+    echo ""
+    read -p "Your choice: " choice
+
+    case "$choice" in
+        y|Y)
+            install_slssteam
+            ;;
+        n|N|"")
+            echo "SLSsteam skipped."
+            ;;
+        *)
+            echo "Invalid option. Skipping SLSsteam."
+            ;;
+    esac
+}
+
+# ============================================================
+# FINAL PROMPT
+# ============================================================
+
+install_slssteam_ask
+
+echo -e "${GREEN}Process completed!${NC}"
+echo "Protocol complete. Welcome to the Wired."
