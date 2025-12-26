@@ -382,15 +382,16 @@ install_slssteam() {
     if [ -f "$STEAM_SH" ]; then
         echo "Patching steam.sh..."
 
-        # Check if already patched (avoid duplicates)
-        if grep -q "LD_AUDIT.*SLSsteam.so" "$STEAM_SH" 2>/dev/null; then
-            echo "steam.sh already patched with SLSsteam."
+        # Check if already patched (avoid duplicates) - more robust check
+        if grep -q -F "LD_AUDIT.*SLSsteam" "$STEAM_SH" 2>/dev/null; then
+            echo "steam.sh already patched with SLSsteam. Skipping..."
         else
             # Backup before patching
-            cp "$STEAM_SH" "$STEAM_SH.bak" 2>/dev/null || true
+            cp "$STEAM_SH" "$STEAM_SH.bak"
+            echo "Backup created at: $STEAM_SH.bak"
 
-            # Simple patch: add export after line 10
-            sed -i "10a export LD_AUDIT=\"$SLSSTEAM_INSTALL_DIR/SLSsteam.so\"" "$STEAM_SH"
+            # Simple patch: add export after STEAM_GLOBAL line
+            sed -i '/^export STEAM_GLOBAL=.*/a export LD_AUDIT="'"$SLSSTEAM_INSTALL_DIR/SLSsteam.so"'"' "$STEAM_SH"
             echo "Patch applied."
         fi
     else
