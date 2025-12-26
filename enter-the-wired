@@ -384,43 +384,25 @@ EOF
         if grep -q "LD_AUDIT.*SLSsteam.so" "$STEAM_SH" 2>/dev/null; then
             echo "steam.sh already patched with SLSsteam."
         else
-            # Backup
-            cp "$STEAM_SH" "$STEAM_SH.bak" || true
+            # Backup before patching
+            cp "$STEAM_SH" "$STEAM_SH.bak" 2>/dev/null || true
 
-            # Find line with SESSION_ROOT export and add after it
-            SESSION_LINE=$(grep -n 'export SESSION_ROOT' "$STEAM_SH" 2>/dev/null | head -1 | cut -d: -f1 || true)
-            if [ -n "$SESSION_LINE" ]; then
-                sed -i "${SESSION_LINE}a\\
-export LD_AUDIT=\"$SLSSTEAM_INSTALL_DIR/SLSsteam.so\"" "$STEAM_SH" || true
-                echo "Patch applied after SESSION_ROOT."
-            else
-                # Fallback: add at the beginning of the file after shebang if any
-                if head -1 "$STEAM_SH" | grep -q '^#!'; then
-                    sed -i '1a\
-export LD_AUDIT="'"$SLSSTEAM_INSTALL_DIR"'/SLSsteam.so"' "$STEAM_SH" || true
-                    echo "Patch applied after shebang (SESSION_ROOT not found)."
-                else
-                    echo -e "${YELLOW}Warning: Could not find insertion point for patch.${NC}"
-                fi
-            fi
+            # Simple patch: add export after line 10
+            sed -i "10a export LD_AUDIT=\"$SLSSTEAM_INSTALL_DIR/SLSsteam.so\"" "$STEAM_SH"
+            echo "Patch applied."
         fi
     else
-        echo -e "${RED}Warning: steam.sh not found at $STEAM_SH${NC}"
+        echo -e "${YELLOW}Warning: steam.sh not found at $STEAM_SH${NC}"
     fi
 
     # Create libcurl symlink (required for SLSsteam)
     STEAM_LIB_DIR="$STEAM_DIR/ubuntu12_32"
     mkdir -p "$STEAM_LIB_DIR"
 
-    # Find any libcurl in /usr/lib32 and symlink it
-    CURL_SOURCE=$(find /usr/lib32 -name 'libcurl.so*' 2>/dev/null | head -1)
-    if [ -n "$CURL_SOURCE" ]; then
-        rm -f "$STEAM_LIB_DIR/libcurl.so.4"
-        ln -sf "$CURL_SOURCE" "$STEAM_LIB_DIR/libcurl.so.4" || true
-        echo "libcurl.so.4 symlink created from $CURL_SOURCE"
-    else
-        echo -e "${YELLOW}Warning: libcurl not found in /usr/lib32. SLSsteam may not work correctly.${NC}"
-    fi
+    for lib in /usr/lib32/libcurl.so*; do
+        [ -e "$lib" ] && ln -sf "$lib" "$STEAM_LIB_DIR/" 2>/dev/null && break
+    done
+    echo "libcurl symlinked."
 
     echo -e "${GREEN}SLSsteam installed successfully!${NC}"
     echo "Just open Steam normally to play."
