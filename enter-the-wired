@@ -377,6 +377,16 @@ install_slssteam() {
 
     rm -rf /tmp/slssteam_extract "$TEMP_SLS"
 
+    # Create steam.cfg to block Steam updates
+    STEAM_CFG="$STEAM_DIR/steam.cfg"
+    if [ ! -f "$STEAM_CFG" ]; then
+        cat << 'EOF' > "$STEAM_CFG"
+BootStrapperInhibitAll=enable
+BootStrapperForceSelfUpdate=disable
+EOF
+        echo "Steam updates blocked via steam.cfg"
+    fi
+
     # Patch steam.sh
     STEAM_SH="$STEAM_DIR/steam.sh"
     if [ -f "$STEAM_SH" ]; then
