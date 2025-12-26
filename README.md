@@ -56,7 +56,6 @@ cp ~/.steam/steam/steam.sh.bak ~/.steam/steam/steam.sh
 
 - **nukhes** (Discord) - Original idea and concept
 - SLSsteam by AceSLS
-- [Deadboy666](https://github.com/Deadboy666/h3adcr-b) - Core installation logic, Steam patching, and closing method
 
 ## License
 
