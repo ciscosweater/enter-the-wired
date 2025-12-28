@@ -1,0 +1,54 @@
+#!/bin/bash
+
+# This script uninstalls ACCELA and SLSsteam from the user's home directory, providing a clear restart for updates and fixes.
+
+# Remove ACCELA
+ACCELA_DIR="$HOME/.local/share/ACCELA"
+if [ -d "$ACCELA_DIR" ]; then
+	rm -rf "$ACCELA_DIR"
+	if [ ! -d "$ACCELA_DIR" ]; then
+		echo "ACCELA removed successfully."
+	else
+		echo "Error: Failed to remove ACCELA." >&2
+	fi
+else
+		echo "ACCELA directory not found. Skipping..."
+fi
+
+# Remove SLSsteam (Share and Config)
+SLS_SHARE="$HOME/.local/share/SLSsteam"
+SLS_CONFIG="$HOME/.config/SLSsteam"
+FOUND_SLS=0
+
+for dir in "$SLS_SHARE" "$SLS_CONFIG"; do
+	if [ -d "$dir" ]; then
+		rm -rf "$dir"
+		if [ ! -d "$dir" ]; then
+			echo "Removed: $dir"
+			FOUND_SLS=1
+		else
+			echo "Error: Failed to remove $dir" >&2
+		fi
+	fi
+done
+
+if [ $FOUND_SLS -eq 0 ]; then
+	echo "No SLSsteam directories found. Skipping..."
+fi
+
+# Restore Steam Backup
+BACKUP_FILE="$HOME/.steam/steam/steam.sh.bak"
+TARGET_FILE="$HOME/.steam/steam/steam.sh"
+
+if [ -f "$BACKUP_FILE" ]; then
+	cp "$BACKUP_FILE" "$TARGET_FILE"
+	if [ $? -eq 0 ]; then
+		echo "Backup restored successfully."
+	else
+		echo "Error: Failed to overwrite steam.sh with backup." >&2
+	fi
+else
+	echo "No backup file found at $BACKUP_FILE. Skipping restore..."
+fi
+
+echo -e "\033[0;32mACCELA and SLSsteam uninstallation process completed.\033[0m"
