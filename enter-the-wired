@@ -27,7 +27,7 @@ fi
 source /etc/os-release
 
 # ACCELA URL (hosted on catbox.moe)
-ACCELA_URL="https://files.catbox.moe/vst01j.gz"
+ACCELA_URL="https://files.catbox.moe/ffb12t.gz"
 TEMP_ARCHIVE="accela_source.tar.gz"
 INSTALL_DIR="$HOME/accela"
 
