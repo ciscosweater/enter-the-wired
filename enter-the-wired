@@ -66,6 +66,17 @@ detect_distro_family() {
     return 1
 }
 
+# Detect Bazzite vs SteamOS (for injector configuration)
+detect_os_flavor() {
+    if grep -qi "bazzite" /etc/os-release; then
+        echo "bazzite"
+    elif grep -qi "steamos" /etc/os-release; then
+        echo "steamos"
+    else
+        echo "unknown"
+    fi
+}
+
 # Detect and configure distribution family
 FAMILY=$(detect_distro_family)
 
@@ -104,7 +115,7 @@ case "$FAMILY" in
         echo "  - SDL2 Mixer (libsdl2-mixer-dev)"
         echo "  - SDL2 Image (libsdl2-image-dev)"
         echo "  - SDL2 TTF (libsdl2-ttf-dev)"
-        echo "  - libnotify (biblioteca de notificações do desktop)"
+        echo "  - libnotify (desktop notification library)"
         echo "  - GCC/G++"
         exit 1
         ;;
@@ -393,8 +404,87 @@ install_slssteam() {
     echo "Just open Steam normally to play."
 }
 
+configure_slssteam_injector() {
+    local os_flavor
+    os_flavor=$(detect_os_flavor)
+
+    if [[ "$os_flavor" == "unknown" ]]; then
+        echo "Warn: OS is not Bazzite/SteamOS. Skipping injector configuration."
+        return 0
+    fi
+
+    # Define service and paths based on OS
+    local service_name dropin_dir dropin_file backup_dir
+    if [[ "$os_flavor" == "bazzite" ]]; then
+        service_name="gamescope-session-plus@steam.service"
+    else
+        service_name="gamescope-session.service"
+    fi
+
+    dropin_dir="$HOME/.config/systemd/user/${service_name}.d"
+    dropin_file="$dropin_dir/slssteam.conf"
+    backup_dir="$dropin_dir/backups"
+
+    echo "Configuring LD_AUDIT for $os_flavor ($service_name)..."
+
+    # Scan for .so files
+    local sls_dir="$HOME/.local/share/SLSsteam"
+    if [[ ! -d "$sls_dir" ]]; then
+        echo "Warn: SLSsteam directory not found"
+        return 1
+    fi
+
+    local so_files
+    so_files=$(find "$sls_dir" -maxdepth 1 -name "*.so" | sort)
+    if [[ -z "$so_files" ]]; then
+        echo "Warn: No .so files found in $sls_dir"
+        return 1
+    fi
+
+    # Build LD_AUDIT string
+    local ld_audit=""
+    while IFS= read -r so_file; do
+        local portable_path="${so_file/$HOME/%h}"
+        if [[ -z "$ld_audit" ]]; then
+            ld_audit="$portable_path"
+        else
+            ld_audit="$ld_audit:$portable_path"
+        fi
+        echo "  Found: $so_file"
+    done <<< "$so_files"
+
+    # Create backup if drop-in exists
+    mkdir -p "$backup_dir"
+    if [[ -f "$dropin_file" ]]; then
+        local backup_file="$backup_dir/slssteam.conf.bak.$(date +%Y%m%dT%H%M%S)"
+        mv "$dropin_file" "$backup_file"
+        echo "  Backup created: $backup_file"
+    fi
+
+    # Create drop-in
+    mkdir -p "$dropin_dir"
+    cat > "$dropin_file" <<EOF
+[Service]
+Environment="LD_AUDIT=${ld_audit}"
+EOF
+    chmod 644 "$dropin_file"
+    echo "  Drop-in created: $dropin_file"
+
+    # Enable SafeMode in config
+    local config_file="$HOME/.config/SLSsteam/config.yaml"
+    if [[ -f "$config_file" ]]; then
+        sed -i 's/^SafeMode:.*/SafeMode: yes/' "$config_file"
+        echo "  SafeMode enabled"
+    fi
+
+    # Reload systemd
+    systemctl --user daemon-reload
+    echo "Injector configured successfully."
+}
+
 echo -e "${GREEN}Installing SLSsteam...${NC}"
 install_slssteam
+configure_slssteam_injector
 
 echo ""
 echo "=============================================="

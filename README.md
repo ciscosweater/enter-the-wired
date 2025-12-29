@@ -114,6 +114,7 @@ python -c "import accela"
 
 - **nukhes** (Discord) - Original idea and concept
 - **ciscosweater** - Main maintainer
+- **JD Ros** (YouTube) - LD_AUDIT systemd drop-in integration
 - SLSsteam by AceSLS
 
 ## License
