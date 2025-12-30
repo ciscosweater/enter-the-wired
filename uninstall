@@ -1,91 +1,60 @@
 #!/bin/bash
 set -euo pipefail
 
+# Colors (disabled if not interactive terminal)
+if [ -t 1 ] && [ -t 0 ]; then
+    GREEN='\033[0;32m'
+    RED='\033[0;31m'
+    NC='\033[0m'
+else
+    GREEN=''
+    RED=''
+    NC=''
+fi
+
 # This script uninstalls ACCELA and SLSsteam from the user's home directory, providing a clear restart for updates and fixes.
 
-# --- OS Detection ---
-detect_os_flavor() {
-	if grep -qi "bazzite" /etc/os-release; then
-		echo "bazzite"
-	elif grep -qi "steamos" /etc/os-release; then
-		echo "steamos"
-	else
-		echo "unknown"
-	fi
+# --- Uninstall SLSsteam Injection ---
+uninstall_slssteam_injection() {
+    echo "Cleaning up SLSsteam injection..."
+
+    local steam_script="/usr/bin/steam"
+    local steam_backup="${steam_script}.bak"
+    local desktop_shortcut="$HOME/.local/share/applications/steam.desktop"
+    local autostart_file="$HOME/.config/autostart/steam.desktop"
+
+    # Restore original steam script from backup
+    if [[ -f "$steam_backup" ]]; then
+        sudo cp "$steam_backup" "$steam_script"
+        echo "  Restored original: $steam_script"
+    else
+        echo "  No backup found at $steam_backup"
+        # Try to remove LD_AUDIT lines manually
+        if grep -q "LD_AUDIT.*SLSsteam" "$steam_script" 2>/dev/null; then
+            sudo sed -i '/^export LD_AUDIT.*SLSsteam/d' "$steam_script"
+            echo "  Removed LD_AUDIT lines from $steam_script"
+        fi
+    fi
+
+    # Remove desktop shortcut override (system shortcut will be used again)
+    if [[ -f "$desktop_shortcut" ]]; then
+        rm -f "$desktop_shortcut"
+        echo "  Removed desktop shortcut override."
+    fi
+
+    # Restore autostart to use /usr/bin/steam
+    if [[ -f "$autostart_file" ]]; then
+        sed -i 's|/usr/local/bin/steam|/usr/bin/steam|g' "$autostart_file"
+        sed -i 's|Exec=steam|Exec=/usr/bin/steam|' "$autostart_file"
+        echo "  Restored autostart entry."
+    fi
 }
 
-# --- Get Service Name ---
-get_service_name() {
-	local os_flavor="$1"
-	if [[ "$os_flavor" == "bazzite" ]]; then
-		echo "gamescope-session-plus@steam.service"
-	else
-		echo "gamescope-session.service"
-	fi
-}
-
-# --- Uninstall Injector ---
-uninstall_injector() {
-	local os_flavor
-	os_flavor=$(detect_os_flavor)
-
-	if [[ "$os_flavor" == "unknown" ]]; then
-		echo "OS is not Bazzite/SteamOS. Skipping injector cleanup."
-		return 0
-	fi
-
-	echo "Cleaning up SLSsteam injector for $os_flavor..."
-
-	local service_name
-	service_name=$(get_service_name "$os_flavor")
-	local dropin_dir="$HOME/.config/systemd/user/${service_name}.d"
-	local dropin_file="$dropin_dir/slssteam.conf"
-	local backup_dir="$dropin_dir/backups"
-	local bin_wrapper="$HOME/.local/bin/steam"
-	local desktop_shortcut="$HOME/.local/share/applications/steam.desktop"
-	local autostart_file="$HOME/.config/autostart/steam.desktop"
-
-	# Remove systemd drop-in (common to all)
-	if [[ -f "$dropin_file" ]]; then
-		mkdir -p "$backup_dir"
-		local saved="$backup_dir/slssteam.conf.removed.$(date +%Y%m%dT%H%M%S)"
-		mv -f "$dropin_file" "$saved"
-		echo "  Removed Gaming Mode drop-in (backup: $saved)"
-		systemctl --user daemon-reload
-	else
-		echo "  Gaming Mode drop-in not found."
-	fi
-
-	# Remove Desktop Mode files (check existence, not OS)
-	if [[ -f "$bin_wrapper" ]] || [[ -f "$desktop_shortcut" ]]; then
-		# Revert autostart
-		if [[ -f "$autostart_file" ]]; then
-			sed -i "s|^Exec=$bin_wrapper|Exec=/usr/bin/steam|" "$autostart_file"
-			sed -i "s|^Exec=steam|Exec=/usr/bin/steam|" "$autostart_file"
-			echo "  Reverted autostart entry."
-		fi
-
-		# Remove desktop shortcut
-		if [[ -f "$desktop_shortcut" ]]; then
-			rm -f "$desktop_shortcut"
-			echo "  Removed desktop shortcut override."
-		fi
-
-		# Remove wrapper
-		if [[ -f "$bin_wrapper" ]]; then
-			rm -f "$bin_wrapper"
-			echo "  Removed desktop wrapper."
-		fi
-	else
-		echo "  No Desktop Mode overrides found."
-	fi
-}
-
-echo -e "\033[0;32mStarting uninstallation...\033[0m"
+echo -e "${GREEN}Starting uninstallation...${NC}"
 echo ""
 
-# Uninstall Injector first (needs systemd access)
-uninstall_injector
+# Uninstall SLSsteam injection first (needs sudo)
+uninstall_slssteam_injection
 echo ""
 
 # Remove ACCELA
@@ -122,20 +91,5 @@ if [ $FOUND_SLS -eq 0 ]; then
 	echo "No SLSsteam directories found. Skipping..."
 fi
 
-# Restore Steam Backup
-BACKUP_FILE="$HOME/.steam/steam/steam.sh.bak"
-TARGET_FILE="$HOME/.steam/steam/steam.sh"
-
-if [ -f "$BACKUP_FILE" ]; then
-	cp "$BACKUP_FILE" "$TARGET_FILE"
-	if [ $? -eq 0 ]; then
-		echo "Backup restored successfully."
-	else
-		echo "Error: Failed to overwrite steam.sh with backup." >&2
-	fi
-else
-	echo "No backup file found at $BACKUP_FILE. Skipping restore..."
-fi
-
 echo ""
-echo -e "\033[0;32mUninstallation completed. Reboot recommended.\033[0m"
+echo -e "${GREEN}Uninstallation completed. Reboot recommended.${NC}"

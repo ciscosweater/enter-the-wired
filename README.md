@@ -32,6 +32,11 @@ curl -fsSL https://raw.githubusercontent.com/ciscosweater/enter-the-wired/main/e
   - libnotify
   - .NET SDK 9.0
   - p7zip
+  - Konsole (if no terminal is detected)
+
+- **Terminal Detection**
+  - Checks for: wezterm, konsole, gnome-terminal, ptyxis, alacritty, tilix, xfce4-terminal, terminator, mate-terminal, lxterminal, xterm, kitty
+  - Automatically installs Konsole if no terminal is found
 
 - **ACCELA Setup**
   - Downloads pre-compiled source from catbox.moe
@@ -41,10 +46,11 @@ curl -fsSL https://raw.githubusercontent.com/ciscosweater/enter-the-wired/main/e
 
 - **SLSsteam Integration (LD_AUDIT Injection)**
   - Installs latest release from GitHub
-  - **Gaming Mode**: Uses systemd drop-in (`LD_AUDIT` environment variable)
-  - **Desktop Mode** (Bazzite): Creates wrapper script and patches desktop shortcuts
-  - Automatic backup with timestamp
+  - Modifies `/usr/bin/steam` to add LD_AUDIT environment variable
+  - Creates backup before modification
+  - Works in both **Gaming Mode** and **Desktop Mode** on all distributions
   - SafeMode enabled by default
+  - PlayNotOwnedGames enabled by default
   - Configuration via `~/.config/SLSsteam/config.yaml`
 
 ## Requirements
@@ -60,7 +66,7 @@ curl -fsSL https://raw.githubusercontent.com/ciscosweater/enter-the-wired/main/e
 ACCELA:        ~/.local/share/ACCELA/
 SLSsteam:      ~/.local/share/SLSsteam/
 SLSsteam cfg:  ~/.config/SLSsteam/
-Systemd drop:  ~/.config/systemd/user/gamescope-session*.d/slssteam.conf
+Steam backup:  /usr/bin/steam.bak
 ```
 
 ## Manual Installation
@@ -78,11 +84,32 @@ curl -fsSL https://raw.githubusercontent.com/ciscosweater/enter-the-wired/main/u
 ```
 
 The uninstall script will:
-- Remove LD_AUDIT systemd drop-in
-- Clean up Desktop Mode wrapper and shortcuts
+- Restore `/usr/bin/steam` from backup
+- Remove desktop shortcut override
 - Remove ACCELA directory
 - Remove SLSsteam directories
-- Restore any backups
+
+## How it Works
+
+1. **Distribution Detection**: Reads `/etc/os-release` to identify the package manager
+2. **Terminal Check**: Scans for installed terminals, installs Konsole if none found
+3. **Dependency Installation**: Installs all required system packages
+4. **ACCELA Setup**: Downloads and extracts ACCELA, then sets up the Python venv
+5. **SLSsteam**:
+   - Fetches latest release from GitHub
+   - Creates backup of `/usr/bin/steam`
+   - Modifies `/usr/bin/steam` to add LD_AUDIT environment variable
+   - Works in Gaming Mode and Desktop Mode on all distributions
+
+## Compatibility Matrix
+
+| Distribution | Gaming Mode | Desktop Mode |
+|--------------|-------------|--------------|
+| SteamOS (Steam Deck) | `/usr/bin/steam` | `/usr/bin/steam` |
+| Bazzite | `/usr/bin/steam` | `/usr/bin/steam` |
+| Ubuntu/Debian/Fedora/Arch | `/usr/bin/steam` | `/usr/bin/steam` |
+
+**Note:** The installer modifies `/usr/bin/steam` directly on all distributions. A backup is created at `/usr/bin/steam.bak` before modification.
 
 ## Troubleshooting
 
@@ -99,28 +126,21 @@ source ~/.local/share/ACCELA/.venv/bin/activate
 python -c "import accela"
 ```
 
-### SLSsteam not working on SteamOS/Bazzite
-- Ensure you rebooted after installation (systemd needs reload)
-- Check the injector status in systemd:
-```bash
-systemctl --user status gamescope-session.service
-```
+### SLSsteam not working
+- Check if LD_AUDIT is set in `/usr/bin/steam`: `grep LD_AUDIT /usr/bin/steam`
+- Verify backup exists: `ls -l /usr/bin/steam.bak`
+- Restore from backup if needed: `sudo cp /usr/bin/steam.bak /usr/bin/steam`
 
-## How it Works
-
-1. **Distribution Detection**: Reads `/etc/os-release` to identify the package manager
-2. **Dependency Installation**: Installs all required system packages
-3. **ACCELA Setup**: Downloads and extracts ACCELA, then sets up the Python venv
-4. **SLSsteam**: Fetches latest release from GitHub, configures LD_AUDIT injection
-   - **Gaming Mode**: Creates systemd drop-in for `gamescope-session.service`
-   - **Desktop Mode**: Creates wrapper script and patches desktop entries (Bazzite only)
+### No terminal detected
+The installer will automatically install Konsole. If you prefer a different terminal, install it manually before running the installer.
 
 ## Credits
 
 - **nukhes** (Discord) - Original idea and concept
 - **ciscosweater** - Main maintainer
-- **JD Ros** (YouTube) - LD_AUDIT systemd drop-in integration
-- SLSsteam by AceSLS
+- **JD Ros** (YouTube) - LD_AUDIT integration research
+- **AceSLS** - SLSsteam developer
+- Community contributors
 
 ## License
 
