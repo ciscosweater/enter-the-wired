@@ -38,6 +38,7 @@ curl -fsSL https://raw.githubusercontent.com/ciscosweater/enter-the-wired/main/e
   - .NET SDK 9.0
   - p7zip
   - Konsole (if no terminal is detected)
+  - Non-critical installation - continues on failure
 
 - **Terminal Detection**
   - Checks for: wezterm, konsole, gnome-terminal, ptyxis, alacritty, tilix, xfce4-terminal, terminator, mate-terminal, lxterminal, xterm, kitty
@@ -90,6 +91,24 @@ chmod +x enter-the-wired
 ./enter-the-wired
 ```
 
+### Local ACCELA Archive
+
+If you have a local ACCELA archive (`ACCELA*.tar.gz`) in the same directory as the installer, it will be used instead of downloading from the internet. This is useful for:
+
+- Offline installation
+- Using a custom or pre-modified ACCELA version
+- Faster installation without downloading
+
+```bash
+# Place your archive in the same directory as the installer
+ls -la
+# enter-the-wired
+# ACCELA-2025.01.15-linux-source.tar.gz
+
+./enter-the-wired
+# Will automatically detect and use the local archive
+```
+
 ## Automatic Steam Update Handling
 
 When Steam or SLSsteam updates, the installer handles it automatically:
@@ -117,7 +136,7 @@ The uninstall script will:
 1. **Distribution Detection**: Reads `/etc/os-release` to identify the package manager
 2. **Steam Detection**: Checks for native or Flatpak Steam installation
 3. **Terminal Check**: Scans for installed terminals, installs Konsole if none found
-4. **Dependency Installation**: Installs all required system packages
+4. **Dependency Installation**: Attempts to install all required system packages (non-critical, continues on failure)
 5. **ACCELA Setup**: Downloads and extracts ACCELA, then sets up the Python venv
 6. **SLSsteam**:
    - Fetches latest release from GitHub
@@ -140,7 +159,7 @@ The uninstall script will:
 The installer will warn you to close Steam before proceeding with SLSsteam installation.
 
 ### .NET SDK installation fails
-The script uses Microsoft's official installation script. If it fails, ensure you have an internet connection and try running the installer again.
+The script uses Microsoft's official installation script. If it fails, the installer will continue with a warning. ACCELA may work without .NET SDK for some features.
 
 ### ACCELA fails to start
 Check that the virtual environment was created correctly:

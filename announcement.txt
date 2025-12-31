@@ -5,6 +5,7 @@ Ele detecta sua distribuição Linux e tenta instalar as dependências automatic
 
 **Principais Funcionalidades:**
 - Instalação automática de dependências (Fedora, Debian/Ubuntu, Arch, Bazzite/SteamOS)
+- Instalação não-crítica - continua mesmo se algumas dependências falharem
 - Suporte a Steam nativa e Flatpak (detecção automática)
 - Detecção e instalação automática de terminal (Konsole se não tiver nenhum)
 - Modifica `/usr/bin/steam` diretamente com injeção LD_AUDIT
@@ -32,6 +33,12 @@ chmod +x enter-the-wired
 ```
 ./enter-the-wired
 ```
+### Arquivo ACCELA Local
+Se você tiver um arquivo `ACCELA*.tar.gz` local, o instalador o utilizará automaticamente em vez de baixar da internet. Útil para:
+- Instalação offline
+- Usar uma versão customizada do ACCELA
+- Instalação mais rápida
+
 ### Tratamento Automático de Atualizações da Steam
 
 Quando a Steam ou SLSsteam atualizam, o instalador lida com isso automaticamente:
@@ -63,6 +70,7 @@ It detects your Linux distribution and attempts to install dependencies automati
 
 **Main Features:**
 - Automatic dependency installation (Fedora, Debian/Ubuntu, Arch, Bazzite/SteamOS)
+- Non-critical installation - continues even if some dependencies fail
 - Native Steam and Flatpak Steam support (automatic detection)
 - Automatic terminal detection and installation (Konsole if none found)
 - Modifies `/usr/bin/steam` directly with LD_AUDIT injection
@@ -90,6 +98,12 @@ chmod +x enter-the-wired
 ```
 ./enter-the-wired
 ```
+### Local ACCELA Archive
+If you have a local `ACCELA*.tar.gz` file, the installer will automatically use it instead of downloading from the internet. Useful for:
+- Offline installation
+- Using a custom ACCELA version
+- Faster installation
+
 ### Automatic Steam Update Handling
 
 When Steam or SLSsteam updates, the installer handles it automatically:
