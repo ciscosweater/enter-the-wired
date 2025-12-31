@@ -81,9 +81,11 @@ fi
 # Remove SLSsteam (Share and Config)
 SLS_SHARE="$HOME/.local/share/SLSsteam"
 SLS_CONFIG="$HOME/.config/SLSsteam"
+FLATPAK_SLS_SHARE="$HOME/.var/app/com.valvesoftware.Steam/.local/share/SLSsteam"
+FLATPAK_SLS_CONFIG="$HOME/.var/app/com.valvesoftware.Steam/.config/SLSsteam"
 FOUND_SLS=0
 
-for dir in "$SLS_SHARE" "$SLS_CONFIG"; do
+for dir in "$SLS_SHARE" "$SLS_CONFIG" "$FLATPAK_SLS_SHARE" "$FLATPAK_SLS_CONFIG"; do
 	if [ -d "$dir" ]; then
 		rm -rf "$dir"
 		if [ ! -d "$dir" ]; then

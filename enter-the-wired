@@ -37,6 +37,180 @@ PACKAGE_LIST=""
 NEEDS_UPDATE=false
 SKIP_DEPS=false
 
+# Steam directories (native and Flatpak)
+STEAM_DIR="$HOME/.steam/steam"
+FLATPAK_STEAM_DIR="$HOME/.var/app/com.valvesoftware.Steam/.steam/steam"
+FLATPAK_SLS_INSTALL_DIR="$HOME/.var/app/com.valvesoftware.Steam/.local/share/SLSsteam"
+FLATPAK_SLS_CONFIG_DIR="$HOME/.var/app/com.valvesoftware.Steam/.config/SLSsteam"
+
+# Function to detect Steam installation type
+get_steam_dir() {
+    if [ -d "$FLATPAK_STEAM_DIR" ]; then
+        echo "$FLATPAK_STEAM_DIR"
+    else
+        echo "$STEAM_DIR"
+    fi
+}
+
+get_sls_install_dir() {
+    if [ -d "$FLATPAK_STEAM_DIR" ]; then
+        echo "$FLATPAK_SLS_INSTALL_DIR"
+    else
+        echo "$HOME/.local/share/SLSsteam"
+    fi
+}
+
+get_sls_config_dir() {
+    if [ -d "$FLATPAK_STEAM_DIR" ]; then
+        echo "$FLATPAK_SLS_CONFIG_DIR"
+    else
+        echo "$HOME/.config/SLSsteam"
+    fi
+}
+
+# Function to run Steam with SLSsteam injection
+run_steam_with_sls() {
+    local sls_dir
+    sls_dir=$(get_sls_install_dir)
+    local steam_exe
+
+    if [ -d "$FLATPAK_STEAM_DIR" ]; then
+        steam_exe="flatpak run com.valvesoftware.Steam"
+    else
+        steam_exe="/usr/bin/steam"
+    fi
+
+    local ld_audit=""
+    while IFS= read -r so_file; do
+        if [ -n "$so_file" ]; then
+            if [ -z "$ld_audit" ]; then
+                ld_audit="$so_file"
+            else
+                ld_audit="$ld_audit:$so_file"
+            fi
+        fi
+    done < <(find "$sls_dir" -maxdepth 1 -name "*.so" 2>/dev/null | sort)
+
+    if [ -n "$ld_audit" ]; then
+        LD_AUDIT="$ld_audit" $steam_exe "$@"
+    else
+        echo "  Warning: No SLSsteam .so files found, running Steam without injection" >&2
+        $steam_exe "$@"
+    fi
+}
+
+# Function to patch steam.sh with LD_AUDIT
+patch_steam_sh() {
+    local steam_dir
+    steam_dir=$(get_steam_dir)
+    local sls_dir
+    sls_dir=$(get_sls_install_dir)
+    local steam_sh="$steam_dir/steam.sh"
+
+    if [ ! -f "$steam_sh" ]; then
+        echo "  steam.sh not found at $steam_sh"
+        return 1
+    fi
+
+    # Build LD_AUDIT string
+    local ld_audit=""
+    while IFS= read -r so_file; do
+        if [ -n "$so_file" ]; then
+            if [ -z "$ld_audit" ]; then
+                ld_audit="$so_file"
+            else
+                ld_audit="$ld_audit:$so_file"
+            fi
+        fi
+    done < <(find "$sls_dir" -maxdepth 1 -name "*.so" 2>/dev/null | sort)
+
+    # Check if already patched (use simpler grep pattern)
+    if grep -q "LD_AUDIT.*SLSsteam" "$steam_sh" 2>/dev/null; then
+        echo "  steam.sh already patched, updating..."
+        sed -i '/^export LD_AUDIT.*SLSsteam/d' "$steam_sh"
+    fi
+
+    # Add LD_AUDIT export at line 10 (same approach as headcrab.sh)
+    sed -i '10a export LD_AUDIT="'"$ld_audit"'"' "$steam_sh"
+    echo "  Patched steam.sh at $steam_sh"
+}
+
+# Function to finalize Steam after installation
+finalize_steam() {
+    local steam_dir
+    steam_dir=$(get_steam_dir)
+    local steam_cfg="$steam_dir/steam.cfg"
+
+    echo "Finalizing Steam configuration..."
+
+    # Remove steam.cfg to allow updates
+    if [ -f "$steam_cfg" ]; then
+        rm -f "$steam_cfg"
+        echo "  Removed steam.cfg"
+    fi
+
+    # Kill Steam if running (check for both native and flatpak)
+    local steam_pids
+    steam_pids=$(pgrep -x "steam" 2>/dev/null || true)
+    if [ -z "$steam_pids" ] && [ -d "$FLATPAK_STEAM_DIR" ]; then
+        steam_pids=$(pgrep -f "com.valvesoftware.Steam" 2>/dev/null || true)
+    fi
+
+    if [ -n "$steam_pids" ]; then
+        echo "  Closing Steam..."
+        echo "$steam_pids" | xargs kill 2>/dev/null || true
+        sleep 2
+    fi
+
+    # Run Steam with SLSsteam (allows Steam to update if needed)
+    echo "  Starting Steam (will auto-update if needed)..."
+    run_steam_with_sls &
+    RUN_STEAM_PID=$!
+
+    # Wait for Steam to open
+    sleep 5
+
+    # Wait for Steam to fully start (check both native and flatpak)
+    local attempts=0
+    while [ $attempts -lt 12 ]; do
+        steam_pids=$(pgrep -x "steam" 2>/dev/null || true)
+        if [ -z "$steam_pids" ] && [ -d "$FLATPAK_STEAM_DIR" ]; then
+            steam_pids=$(pgrep -f "com.valvesoftware.Steam" 2>/dev/null || true)
+        fi
+        if [ -n "$steam_pids" ]; then
+            break
+        fi
+        sleep 1
+        attempts=$((attempts + 1))
+    done
+
+    # Give Steam time to update
+    sleep 5
+
+    # Force close Steam
+    steam_pids=$(pgrep -x "steam" 2>/dev/null || true)
+    if [ -z "$steam_pids" ] && [ -d "$FLATPAK_STEAM_DIR" ]; then
+        steam_pids=$(pgrep -f "com.valvesoftware.Steam" 2>/dev/null || true)
+    fi
+
+    if [ -n "$steam_pids" ]; then
+        echo "  Closing Steam..."
+        echo "$steam_pids" | xargs kill 2>/dev/null || true
+        sleep 2
+    fi
+
+    # Also kill the background run we started
+    kill $RUN_STEAM_PID 2>/dev/null || true
+
+    # Create steam.cfg to block future updates
+    cat > "$steam_cfg" << 'EOF'
+BootStrapperInhibitAll=enable
+BootStrapperForceSelfUpdate=disable
+EOF
+    echo "  Created steam.cfg"
+    echo "Status: Patched"
+}
+
 # Function to detect distribution family
 detect_distro_family() {
     # Priority: direct ID > ID_LIKE > specific files
@@ -294,10 +468,10 @@ rm -rf "$INSTALL_DIR"
 install_slssteam() {
     echo -e "${GREEN}Installing SLSsteam...${NC}"
 
-    # Variables
-    SLSSTEAM_INSTALL_DIR="$HOME/.local/share/SLSsteam"
-    SLSSTEAM_CONFIG_DIR="$HOME/.config/SLSsteam"
-    STEAM_DIR="$HOME/.steam/steam"
+    # Variables - use dynamic directories
+    SLSSTEAM_INSTALL_DIR=$(get_sls_install_dir)
+    SLSSTEAM_CONFIG_DIR=$(get_sls_config_dir)
+    STEAM_DIR=$(get_steam_dir)
     STEAM_LIB_DIR="$STEAM_DIR/ubuntu12_32"
     TEMP_SLS="/tmp/slssteam.7z"
 
@@ -347,14 +521,6 @@ install_slssteam() {
         echo "Please install Steam first."
         return 1
     fi
-
-    # Create steam.cfg with recommended settings
-    cat > "$STEAM_DIR/steam.cfg" << 'EOF'
-BootStrapperInhibitAll=enable
-BootStrapperForceSelfUpdate=disable
-EOF
-
-    echo "Steam config created at $STEAM_DIR/steam.cfg"
 
     # Check if Steam is running and warn user
     STEAM_PID=$(pgrep -x "steam" 2>/dev/null || true)
@@ -466,13 +632,8 @@ EOF
 
 # Function to detect Steam Deck (SteamOS)
 is_steam_deck() {
-    if [[ ! -f /etc/os-release ]]; then
-        return 1
-    fi
-
-    source /etc/os-release
-
     # SteamOS has ID=steamos and VARIANT_ID=steamdeck
+    # $ID and $VARIANT_ID are already set from sourcing /etc/os-release at the top
     if [[ "$ID" == "steamos" ]] || [[ "${VARIANT_ID:-}" == "steamdeck" ]]; then
         return 0
     fi
@@ -481,7 +642,8 @@ is_steam_deck() {
 }
 
 configure_slssteam_injection() {
-    local sls_dir="$HOME/.local/share/SLSsteam"
+    local sls_dir
+    sls_dir=$(get_sls_install_dir)
     local steam_script="/usr/bin/steam"
     local ld_audit
 
@@ -537,7 +699,8 @@ configure_slssteam_injection() {
     # Note: Desktop shortcuts are already patched by SLSsteam's setup.sh install
 
     # Enable PlayNotOwnedGames in config
-    local config_file="$HOME/.config/SLSsteam/config.yaml"
+    local config_file
+    config_file=$(get_sls_config_dir)/config.yaml
     if [[ -f "$config_file" ]]; then
         if grep -q "^PlayNotOwnedGames:" "$config_file"; then
             sed -i 's/^PlayNotOwnedGames:.*/PlayNotOwnedGames: yes/' "$config_file"
@@ -561,9 +724,36 @@ configure_slssteam_injection() {
     echo "SLSsteam injection configured successfully."
 }
 
+# Function to get LD_AUDIT string from SLSsteam files
+get_ld_audit() {
+    local sls_dir
+    sls_dir=$(get_sls_install_dir)
+    local ld_audit=""
+
+    while IFS= read -r so_file; do
+        if [ -n "$so_file" ]; then
+            if [ -z "$ld_audit" ]; then
+                ld_audit="$so_file"
+            else
+                ld_audit="$ld_audit:$so_file"
+            fi
+        fi
+    done < <(find "$sls_dir" -maxdepth 1 -name "*.so" 2>/dev/null | sort)
+
+    echo "$ld_audit"
+}
+
 echo -e "${GREEN}Installing SLSsteam...${NC}"
 install_slssteam
+
+# First: open Steam without steam.cfg so it can update
+echo -e "${GREEN}Finalizing Steam configuration...${NC}"
+finalize_steam
+
+# Then: patch Steam scripts (after Steam closes)
+echo -e "${GREEN}Patching Steam scripts...${NC}"
 configure_slssteam_injection
+patch_steam_sh
 
 echo ""
 echo "=============================================="
@@ -571,7 +761,7 @@ echo -e "${GREEN}  ALL INSTALLATIONS COMPLETED!${NC}"
 echo "=============================================="
 echo ""
 echo "  ACCELA:  Installed at ~/.local/share/ACCELA"
-echo "  SLSsteam: Installed at ~/.local/share/SLSsteam"
+echo "  SLSsteam: Installed at $(get_sls_install_dir)"
 echo ""
 echo "  Launch ACCELA from your applications menu."
 echo "  To play with SLSsteam, just restart Steam."
