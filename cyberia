@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-.}")" && pwd)"
 VENV_BASE="$HOME/.local/share/millennium/.venv"
 VENV_ACTIVATE="$VENV_BASE/bin/activate"
 PLUGINS_DIR="$HOME/.local/share/millennium/plugins"

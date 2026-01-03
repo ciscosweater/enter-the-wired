@@ -745,6 +745,6 @@ install_slssteam() {
 
 # Run installation if script is executed directly (not sourced)
 # Also run if executed via curl | bash (BASH_SOURCE[0] == "-")
-if [ -z "${BASH_SOURCE:-}" ] || [[ "${BASH_SOURCE[0]}" == "-" ]] || [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+if [ -z "${BASH_SOURCE:-}" ] || [ ${#BASH_SOURCE[@]} -eq 0 ] || [[ "${BASH_SOURCE[0]:-}" == "-" ]] || [[ "${BASH_SOURCE[0]:-}" == "${0}" ]]; then
     install_slssteam
 fi
