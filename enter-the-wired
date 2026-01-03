@@ -5,22 +5,16 @@ set -euo pipefail
 # "I am here. But where is here? And where is here within here?"
 
 # Combo script that installs both ACCELA and SLSsteam
-# Source the individual installation scripts
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Supports both local and curl | bash execution
 
-if [ ! -f "$SCRIPT_DIR/accela" ]; then
-    echo "Error: accela not found in $SCRIPT_DIR"
-    exit 1
+GITHUB_USER="ciscosweater"
+GITHUB_REPO="enter-the-wired"
+
+# Detect if running via curl | bash (BASH_SOURCE[0] == "-")
+RUNNING_VIA_PIPE=false
+if [[ "${BASH_SOURCE[0]:-}" == "-" ]]; then
+    RUNNING_VIA_PIPE=true
 fi
-
-if [ ! -f "$SCRIPT_DIR/slssteam" ]; then
-    echo "Error: slssteam not found in $SCRIPT_DIR"
-    exit 1
-fi
-
-# Source the scripts to load their functions
-source "$SCRIPT_DIR/accela"
-source "$SCRIPT_DIR/slssteam"
 
 # Colors (disabled if not interactive terminal)
 if [ -t 1 ] && [ -t 0 ]; then
@@ -34,6 +28,37 @@ else
     YELLOW=''
     NC=''
 fi
+
+if [ "$RUNNING_VIA_PIPE" = true ]; then
+    # Running via curl | bash - need to fetch scripts from GitHub
+    echo -e "${GREEN}Detected pipe execution, fetching scripts from GitHub...${NC}"
+
+    SCRIPT_DIR=$(mktemp -d)
+    trap "rm -rf $SCRIPT_DIR" EXIT
+
+    # Fetch accela and slssteam scripts
+    curl -fsSL -o "$SCRIPT_DIR/accela" "https://raw.githubusercontent.com/$GITHUB_USER/$GITHUB_REPO/main/accela"
+    curl -fsSL -o "$SCRIPT_DIR/slssteam" "https://raw.githubusercontent.com/$GITHUB_USER/$GITHUB_REPO/main/slssteam"
+
+    chmod +x "$SCRIPT_DIR/accela" "$SCRIPT_DIR/slssteam"
+else
+    # Local execution - source from same directory
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+    if [ ! -f "$SCRIPT_DIR/accela" ]; then
+        echo "Error: accela not found in $SCRIPT_DIR"
+        exit 1
+    fi
+
+    if [ ! -f "$SCRIPT_DIR/slssteam" ]; then
+        echo "Error: slssteam not found in $SCRIPT_DIR"
+        exit 1
+    fi
+fi
+
+# Source the scripts to load their functions
+source "$SCRIPT_DIR/accela"
+source "$SCRIPT_DIR/slssteam"
 
 echo -e "${GREEN}=============================================="
 echo "  ENTER THE WIRED - Combo Installer"
@@ -86,10 +111,7 @@ if [ -f /etc/os-release ]; then
     fi
 fi
 
-# Run installation if script is executed directly (not sourced)
-if [ -n "${BASH_SOURCE:-}" ] && [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
-    echo ""
-    echo "  To play with SLSsteam, just restart Steam."
-    echo ""
-    echo "Protocol complete. Welcome to the Wired."
-fi
+echo ""
+echo "  To play with SLSsteam, just restart Steam."
+echo ""
+echo "Protocol complete. Welcome to the Wired."
