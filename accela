@@ -173,7 +173,7 @@ install_accela() {
     case "$FAMILY" in
         fedora)
             echo -e "Detected system: ${GREEN}Fedora${NC} family"
-            PACKAGE_LIST="python3 python3-pip python3-devel SDL2-devel gcc SDL2_mixer-devel SDL2_image-devel SDL2_ttf-devel git libnotify-devel p7zip p7zip-plugins"
+            PACKAGE_LIST="python3 python3-venv python3.12-venv python3.13-venv python3-pip python3-devel SDL2-devel gcc SDL2_mixer-devel SDL2_image-devel SDL2_ttf-devel git libnotify-devel p7zip p7zip-plugins"
 
             # Check for rpm-ostree (Fedora Atomic/Silverblue/Kinoite/Bazzite)
             if command -v rpm-ostree &>/dev/null && rpm-ostree status &>/dev/null 2>&1; then
