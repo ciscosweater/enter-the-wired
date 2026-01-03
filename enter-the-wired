@@ -10,9 +10,9 @@ set -euo pipefail
 GITHUB_USER="ciscosweater"
 GITHUB_REPO="enter-the-wired"
 
-# Detect if running via curl | bash (BASH_SOURCE[0] == "-")
+# Detect if running via curl | bash (BASH_SOURCE[0] == "-" or BASH_SOURCE empty)
 RUNNING_VIA_PIPE=false
-if [[ "${BASH_SOURCE[0]:-}" == "-" ]]; then
+if [ -z "${BASH_SOURCE:-}" ] || [[ "${BASH_SOURCE[0]:-}" == "-" ]]; then
     RUNNING_VIA_PIPE=true
 fi
 
