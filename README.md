@@ -187,7 +187,7 @@ The installer will automatically install Konsole. If you prefer a different term
 
 ## License
 
-This installer is provided as-is.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ## Repository
 
