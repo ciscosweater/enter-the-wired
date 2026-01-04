@@ -234,9 +234,6 @@ install_accela() {
             ;;
     esac
 
-    echo -e "Package manager: ${GREEN}${FAMILY}${NC}"
-    echo -e "Packages to install: ${GREEN}$PACKAGE_LIST${NC}"
-
     # Extra step for Debian/Ubuntu
     if [ "${NEEDS_UPDATE:-false}" = true ]; then
         echo "Enabling 32-bit (i386) architecture..."
