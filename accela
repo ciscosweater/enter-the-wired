@@ -307,6 +307,9 @@ install_accela() {
 
     mkdir -p "$INSTALL_DIR"
 
+    # Clean up any previous installation in INSTALL_DIR
+    rm -rf "$INSTALL_DIR"/*
+
     echo "Extracting archive..."
     if ! tar -xzf "$TEMP_ARCHIVE" -C "$INSTALL_DIR"; then
         echo -e "${RED}Error extracting archive. Download may be corrupted.${NC}"
