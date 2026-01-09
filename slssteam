@@ -161,7 +161,7 @@ close_steam() {
     return 1
 }
 
-# Function to create wrapper at /usr/local/bin/steam for Bazzite Game Mode
+# Function to create wrapper at /usr/local/bin/steam
 create_steam_wrapper() {
     local wrapper_path="/usr/local/bin/steam"
     local ld_audit
@@ -178,7 +178,6 @@ create_steam_wrapper() {
     echo "  Creating Steam wrapper at $wrapper_path..."
     sudo tee "$wrapper_path" > /dev/null << EOF
 #!/usr/bin/env bash
-# BazziteOS Game Mode wrapper for SLSsteam
 export LD_AUDIT="$ld_audit"
 exec /usr/bin/steam "\$@"
 EOF
@@ -736,14 +735,10 @@ install_slssteam() {
         patch_steam_sh
     fi
 
-    # Create wrapper at /usr/local/bin/steam for Bazzite Game Mode (redundant injection)
-    if [ "$FAMILY" = "bazzite" ]; then
-        echo ""
-        echo -e "${GREEN}Creating Steam wrapper for Bazzite Game Mode...${NC}"
-        create_steam_wrapper
-    else
-        echo "  Skipping wrapper creation (not Bazzite)"
-    fi
+    # Create wrapper at /usr/local/bin/steam for Game Mode injection
+    echo ""
+    echo -e "${GREEN}Creating Steam wrapper...${NC}"
+    create_steam_wrapper
 
     echo ""
     echo "SLSsteam installed and configured successfully!"
