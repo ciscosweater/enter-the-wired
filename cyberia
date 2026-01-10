@@ -48,9 +48,8 @@ install_cyberia(){
     fi
 
     echo "Extracting..."
-    rm -rf "$PLUGINS_DIR"/cyberia*
-    unzip -o -q "$zip_path" -d "$PLUGINS_DIR/"
-    mv "$PLUGINS_DIR/cyberia-v${version}" "$PLUGINS_DIR/cyberia"
+    rm -rf "$PLUGINS_DIR/cyberia"
+    unzip -o -q "$zip_path" -d "$PLUGINS_DIR/" && mv "$PLUGINS_DIR/cyberia-v${version}" "$PLUGINS_DIR/cyberia"
 
     echo "Installing dependencies..."
     source "$VENV_ACTIVATE"
