@@ -39,7 +39,7 @@ install_cyberia(){
     latest_tag=$(get_latest_release)
     version="${latest_tag#v}"
     zip_path="$SCRIPT_DIR/cyberia-v${version}.zip"
-    plugin_dir="$PLUGINS_DIR/cyberia-v${version}"
+    plugin_dir="$PLUGINS_DIR/cyberia"
 
     echo "Downloading Cyberia ${latest_tag}..."
     if ! wget -q --show-progress "https://github.com/ciscosweater/cyberia/releases/download/${latest_tag}/cyberia-v${version}.zip" -O "$zip_path"; then
@@ -49,7 +49,7 @@ install_cyberia(){
 
     echo "Extracting..."
     rm -rf "$PLUGINS_DIR"/cyberia-v*
-    unzip -q "$zip_path" -d "$PLUGINS_DIR/"
+    unzip -o -q "$zip_path" -d "$plugin_dir"
 
     echo "Installing dependencies..."
     source "$VENV_ACTIVATE"
