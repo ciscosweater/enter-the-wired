@@ -22,13 +22,8 @@ get_latest_release() {
 install_cyberia(){
     local latest_tag version zip_path plugin_dir
 
-    # Check if Millennium is installed
-    if ! check_millennium; then
-        echo "Millennium not found. Installing..."
-        install_millennium
-    else
-        echo "Millennium already installed."
-    fi
+    echo "Installing Millennium..."
+    install_millennium
 
     # Create venv if it doesn't exist
     if [ ! -f "$VENV_ACTIVATE" ]; then
