@@ -47,6 +47,7 @@ install_cyberia(){
     unzip -o -q "$zip_path" -d "$temp_dir"
 
     echo "Updating plugin files..."
+    mkdir -p "$PLUGINS_DIR"
     if [ -d "$PLUGINS_DIR/cyberia" ]; then
         rsync -av "$temp_dir/cyberia-v${version}/" "$PLUGINS_DIR/cyberia/"
     else
