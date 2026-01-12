@@ -36,11 +36,12 @@ if [ "$RUNNING_VIA_PIPE" = true ]; then
     SCRIPT_DIR=$(mktemp -d)
     trap "rm -rf $SCRIPT_DIR" EXIT
 
-    # Fetch accela and slssteam scripts
+    # Fetch accela, slssteam, and fix-deps scripts
     curl -fsSL -o "$SCRIPT_DIR/accela" "https://raw.githubusercontent.com/$GITHUB_USER/$GITHUB_REPO/main/accela"
     curl -fsSL -o "$SCRIPT_DIR/slssteam" "https://raw.githubusercontent.com/$GITHUB_USER/$GITHUB_REPO/main/slssteam"
+    curl -fsSL -o "$SCRIPT_DIR/fix-deps" "https://raw.githubusercontent.com/$GITHUB_USER/$GITHUB_REPO/main/fix-deps"
 
-    chmod +x "$SCRIPT_DIR/accela" "$SCRIPT_DIR/slssteam"
+    chmod +x "$SCRIPT_DIR/accela" "$SCRIPT_DIR/slssteam" "$SCRIPT_DIR/fix-deps"
 else
     # Local execution - source from same directory
     SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -54,19 +55,36 @@ else
         echo "Error: slssteam not found in $SCRIPT_DIR"
         exit 1
     fi
-fi
 
-# Source the scripts - they will auto-execute install_accela and install_slssteam
-source "$SCRIPT_DIR/accela"
-source "$SCRIPT_DIR/slssteam"
+    if [ ! -f "$SCRIPT_DIR/fix-deps" ]; then
+        echo "Error: fix-deps not found in $SCRIPT_DIR"
+        exit 1
+    fi
+fi
 
 echo -e "${GREEN}=============================================="
 echo "  ENTER THE WIRED - Combo Installer"
 echo "==============================================${NC}"
 echo ""
 
+# Run fix-deps first to ensure all dependencies are installed
+echo "Installing dependencies..."
+echo "----------------------------------------------"
+source "$SCRIPT_DIR/fix-deps"
+echo ""
+
 echo "If you have issues with missing dependencies, run:"
 echo "  ./fix-deps"
+
+echo ""
+echo "=============================================="
+echo -e "${GREEN}  INSTALLING COMPONENTS${NC}"
+echo "=============================================="
+echo ""
+
+# Source the scripts - they will auto-execute install_accela and install_slssteam
+source "$SCRIPT_DIR/accela"
+source "$SCRIPT_DIR/slssteam"
 
 echo ""
 echo "=============================================="
