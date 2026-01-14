@@ -82,6 +82,15 @@ find_steam_directory() {
 
 # This script uninstalls ACCELA and SLSsteam from the user's home directory, providing a clear restart for updates and fixes.
 
+# Check if running on Bazzite
+is_bazzite() {
+    if [ -f /etc/os-release ]; then
+        source /etc/os-release
+        [[ "$ID" == "bazzite" ]] && return 0
+    fi
+    return 1
+}
+
 # --- Uninstall SLSsteam Injection ---
 uninstall_slssteam_injection() {
     echo "Cleaning up SLSsteam injection..."
@@ -90,6 +99,10 @@ uninstall_slssteam_injection() {
     local steam_backup
     local desktop_shortcut="$HOME/.local/share/applications/steam.desktop"
     local autostart_file="$HOME/.config/autostart/steam.desktop"
+
+    # Detect Bazzite
+    local is_bazzite=0
+    is_bazzite && is_bazzite=1
 
     # Steam Deck: Restore steam-jupiter from backup
     local steam_jupiter="/usr/bin/steam-jupiter"
@@ -149,17 +162,41 @@ uninstall_slssteam_injection() {
 
     # Restore autostart to use system steam
     if [[ -f "$autostart_file" ]]; then
-        # Replace any Exec line pointing to steam with system path
-        sed -i 's|Exec=[^ ]*steam[^ ]*|Exec=/usr/bin/steam|g' "$autostart_file"
-        echo "  Restored autostart entry."
+        # Replace any Exec line pointing to steam with appropriate path
+        if [ $is_bazzite -eq 1 ]; then
+            sed -i 's|Exec=[^ ]*steam[^ ]*|Exec=bazzite-steam|g' "$autostart_file"
+            echo "  Restored autostart entry (bazzite-steam)."
+        else
+            sed -i 's|Exec=[^ ]*steam[^ ]*|Exec=/usr/bin/steam|g' "$autostart_file"
+            echo "  Restored autostart entry."
+        fi
     fi
 
     # Also clean up any SLSsteam wrapper if it exists
-    if [[ -f "/usr/local/bin/steam" ]]; then
-        if sudo rm -f "/usr/local/bin/steam"; then
-            echo "  Removed SLSsteam wrapper from /usr/local/bin/steam"
-        else
-            echo -e "  ${YELLOW}Warning: Failed to remove /usr/local/bin/steam${NC}"
+    if [ $is_bazzite -eq 1 ]; then
+        # On Bazzite: remove bazzite-steam and old steam wrapper
+        if [[ -f "/usr/local/bin/bazzite-steam" ]]; then
+            if sudo rm -f "/usr/local/bin/bazzite-steam"; then
+                echo "  Removed bazzite-steam wrapper"
+            else
+                echo -e "  ${YELLOW}Warning: Failed to remove /usr/local/bin/bazzite-steam${NC}"
+            fi
+        fi
+        if [[ -f "/usr/local/bin/steam" ]]; then
+            if sudo rm -f "/usr/local/bin/steam"; then
+                echo "  Removed old steam wrapper"
+            else
+                echo -e "  ${YELLOW}Warning: Failed to remove /usr/local/bin/steam${NC}"
+            fi
+        fi
+    else
+        # On other distros: only remove steam wrapper
+        if [[ -f "/usr/local/bin/steam" ]]; then
+            if sudo rm -f "/usr/local/bin/steam"; then
+                echo "  Removed SLSsteam wrapper from /usr/local/bin/steam"
+            else
+                echo -e "  ${YELLOW}Warning: Failed to remove /usr/local/bin/steam${NC}"
+            fi
         fi
     fi
 

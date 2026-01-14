@@ -179,17 +179,32 @@ close_steam() {
 
 # Function to create wrapper at /usr/local/bin/steam
 create_steam_wrapper() {
-    local wrapper_path="/usr/local/bin/steam"
     local ld_audit
-
     ld_audit=$(get_ld_audit)
+
+    # Detect Bazzite
+    local is_bazzite=0
+    if [ -f /etc/os-release ]; then
+        source /etc/os-release
+        [ "$ID" = "bazzite" ] && is_bazzite=1
+    fi
+
+    # Use different wrapper path based on distro
+    local wrapper_path
+    if [ $is_bazzite -eq 1 ]; then
+        wrapper_path="/usr/local/bin/bazzite-steam"
+        echo "  Creating bazzite-steam wrapper for Bazzite..."
+    else
+        wrapper_path="/usr/local/bin/steam"
+        echo "  Creating Steam wrapper..."
+    fi
 
     if [ ! -d "/usr/local/bin" ]; then
         echo "  Creating /usr/local/bin directory..."
         sudo mkdir -p /usr/local/bin
     fi
 
-    echo "  Creating Steam wrapper at $wrapper_path..."
+    echo "  Creating wrapper at $wrapper_path..."
     sudo tee "$wrapper_path" > /dev/null << EOF
 #!/usr/bin/env bash
 export LD_AUDIT="$ld_audit"
@@ -197,7 +212,7 @@ exec /usr/bin/steam "\$@"
 EOF
 
     sudo chmod +x "$wrapper_path"
-    echo "  Steam wrapper created successfully"
+    echo "  Wrapper created successfully"
 }
 
 # Function to patch steam-jupiter for Steam Deck Gaming Mode

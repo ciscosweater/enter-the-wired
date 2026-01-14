@@ -20,14 +20,24 @@ fi
 # Configuration
 ACCELA_URL="https://github.com/ciscosweater/enter-the-wired/releases/download/2026.01.14/ACCELA-2026.01.14-16_03_34-linux-source.tar.gz"
 ACCELA_APPIMAGE_URL="https://github.com/ciscosweater/enter-the-wired/releases/download/2026.01.14/ACCELA-2026.01.14-16_03_34-linux-appimage.tar.gz"
+ACCELA_BINARY_URL="https://github.com/ciscosweater/enter-the-wired/releases/download/2026.01.14/ACCELA-2026.01.14-16_03_34-linux-binary.tar.gz"
 TEMP_ARCHIVE="accela_source.tar.gz"
 INSTALL_DIR="$HOME/accela"
 
-# Check if running on Bazzite or SteamOS (uses AppImage)
-is_steamos_family() {
+# Check if running on SteamOS (uses AppImage)
+is_steamos() {
     if [ -f /etc/os-release ]; then
         source /etc/os-release
-        [[ "$ID" == "steamos" ]] || [[ "$ID" == "bazzite" ]] && return 0
+        [[ "$ID" == "steamos" ]] && return 0
+    fi
+    return 1
+}
+
+# Check if running on Bazzite (uses binary)
+is_bazzite() {
+    if [ -f /etc/os-release ]; then
+        source /etc/os-release
+        [[ "$ID" == "bazzite" ]] && return 0
     fi
     return 1
 }
@@ -51,13 +61,17 @@ install_accela() {
     export PATH="$HOME/.dotnet:$PATH"
 
     # Cleanup to avoid conflicts with previous installation attempts
-    rm -rf ACCELA-*-linux-source ACCELA-*-linux-appimage "$TEMP_ARCHIVE"
+    rm -rf ACCELA-*-linux-source ACCELA-*-linux-appimage ACCELA-*-linux-binary "$TEMP_ARCHIVE"
 
     # Choose URL based on distribution
-    if is_steamos_family; then
+    if is_bazzite; then
+        ACCELA_URL="$ACCELA_BINARY_URL"
+        TEMP_ARCHIVE="accela_binary.tar.gz"
+        echo "Using binary for Bazzite..."
+    elif is_steamos; then
         ACCELA_URL="$ACCELA_APPIMAGE_URL"
         TEMP_ARCHIVE="accela_appimage.tar.gz"
-        echo "Using AppImage for SteamOS/Bazzite..."
+        echo "Using AppImage for SteamOS..."
     fi
 
     # Procurar por ACCELA*.tar.gz no diretório atual
