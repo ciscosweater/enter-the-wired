@@ -44,7 +44,7 @@ get_latest_release() {
     local asset_type="$1"
     local release_info
 
-    echo "Fetching latest ACCELA release info..."
+    echo "Fetching latest ACCELA release info..." >&2
 
     # Fetch release data from GitHub API
     release_info=$(curl -sSL "https://api.github.com/repos/$GITHUB_REPO/releases/latest")
