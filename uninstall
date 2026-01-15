@@ -14,10 +14,6 @@ else
     NC=''
 fi
 
-# Steam directories (native and Flatpak) - multiple common paths supported
-STEAM_DIR="$HOME/.steam/steam"
-FLATPAK_STEAM_DIR="$HOME/.var/app/com.valvesoftware.Steam/.steam/steam"
-
 # Function to find Steam executable (handles native, Flatpak, custom paths)
 find_steam_executable() {
     # 1. Use standard Steam path
@@ -101,8 +97,8 @@ uninstall_slssteam_injection() {
     local autostart_file="$HOME/.config/autostart/steam.desktop"
 
     # Detect Bazzite
-    local is_bazzite=0
-    is_bazzite && is_bazzite=1
+    local is_bazzite
+    is_bazzite=$(is_bazzite && echo "1" || echo "0")
 
     # Steam Deck: Restore steam-jupiter from backup
     local steam_jupiter="/usr/bin/steam-jupiter"
