@@ -18,10 +18,7 @@ else
 fi
 
 # Configuration
-ACCELA_URL="https://github.com/ciscosweater/enter-the-wired/releases/download/2026.01.14/ACCELA-2026.01.14-16_03_34-linux-source.tar.gz"
-ACCELA_APPIMAGE_URL="https://github.com/ciscosweater/enter-the-wired/releases/download/2026.01.14/ACCELA-2026.01.14-16_03_34-linux-appimage.tar.gz"
-ACCELA_BINARY_URL="https://github.com/ciscosweater/enter-the-wired/releases/download/2026.01.14/ACCELA-2026.01.14-16_03_34-linux-binary.tar.gz"
-TEMP_ARCHIVE="accela_source.tar.gz"
+GITHUB_REPO="ciscosweater/enter-the-wired"
 INSTALL_DIR="$HOME/accela"
 
 # Check if running on SteamOS (uses AppImage)
@@ -40,6 +37,39 @@ is_bazzite() {
         [[ "$ID" == "bazzite" ]] && return 0
     fi
     return 1
+}
+
+# Fetch latest ACCELA release from GitHub API
+get_latest_release() {
+    local asset_type="$1"
+    local release_info
+
+    echo "Fetching latest ACCELA release info..."
+
+    # Fetch release data from GitHub API
+    release_info=$(curl -sSL "https://api.github.com/repos/$GITHUB_REPO/releases/latest")
+
+    if [ -z "$release_info" ] || echo "$release_info" | grep -q '"message":'; then
+        echo -e "${RED}Error fetching release info from GitHub API${NC}"
+        return 1
+    fi
+
+    # Parse the download URL based on asset type
+    case "$asset_type" in
+        source)
+            echo "$release_info" | grep -o '"browser_download_url": *"[^"]*ACCELA-[^"]*-linux-source\.tar\.gz"' | head -1 | sed 's/"browser_download_url": *"\(.*\)"/\1/'
+            ;;
+        appimage)
+            echo "$release_info" | grep -o '"browser_download_url": *"[^"]*ACCELA-[^"]*-linux-appimage\.tar\.gz"' | head -1 | sed 's/"browser_download_url": *"\(.*\)"/\1/'
+            ;;
+        binary)
+            echo "$release_info" | grep -o '"browser_download_url": *"[^"]*ACCELA-[^"]*-linux-binary\.tar\.gz"' | head -1 | sed 's/"browser_download_url": *"\(.*\)"/\1/'
+            ;;
+        *)
+            echo ""
+            return 1
+            ;;
+    esac
 }
 
 # Install ACCELA
@@ -64,14 +94,29 @@ install_accela() {
     rm -rf ACCELA-*-linux-source ACCELA-*-linux-appimage ACCELA-*-linux-binary "$TEMP_ARCHIVE"
 
     # Choose URL based on distribution
+    local TEMP_ARCHIVE
+    local ACCELA_URL
+
     if is_bazzite; then
-        ACCELA_URL="$ACCELA_BINARY_URL"
+        echo "Fetching latest binary release for Bazzite..."
+        ACCELA_URL=$(get_latest_release "binary")
         TEMP_ARCHIVE="accela_binary.tar.gz"
         echo "Using binary for Bazzite..."
     elif is_steamos; then
-        ACCELA_URL="$ACCELA_APPIMAGE_URL"
+        echo "Fetching latest AppImage release for SteamOS..."
+        ACCELA_URL=$(get_latest_release "appimage")
         TEMP_ARCHIVE="accela_appimage.tar.gz"
         echo "Using AppImage for SteamOS..."
+    else
+        echo "Fetching latest source release..."
+        ACCELA_URL=$(get_latest_release "source")
+        TEMP_ARCHIVE="accela_source.tar.gz"
+        echo "Using source build..."
+    fi
+
+    if [ -z "$ACCELA_URL" ]; then
+        echo -e "${RED}Error: Could not find download URL for ACCELA${NC}"
+        return 1
     fi
 
     # Procurar por ACCELA*.tar.gz no diretório atual
