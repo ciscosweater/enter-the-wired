@@ -209,7 +209,7 @@ EOF
         sudo tee "/usr/local/bin/bazzite-steam" > /dev/null << EOF
 #!/usr/bin/env bash
 export LD_AUDIT="$ld_audit"
-exec /usr/bin/steam "\$@"
+exec /usr/bin/bazzite-steam "\$@"
 EOF
         sudo chmod +x "/usr/local/bin/bazzite-steam"
         echo "  Wrapper created: /usr/local/bin/bazzite-steam"
@@ -254,21 +254,21 @@ patch_steam_desktop() {
 
     # Patch autostart file
     if [[ -f "$autostart_file" ]]; then
-        if grep -q "/usr/local/bin/bazzite-steam" "$autostart_file" 2>/dev/null; then
-            echo "  Autostart already uses /usr/local/bin/bazzite-steam"
+        if grep -q "bazzite-steam" "$autostart_file" 2>/dev/null; then
+            echo "  Autostart already uses bazzite-steam"
         else
-            echo "  Patching autostart to use /usr/local/bin/bazzite-steam..."
-            sed -i 's|Exec=[^ ]*steam[^ ]*|Exec=/usr/local/bin/bazzite-steam|g' "$autostart_file"
+            echo "  Patching autostart to use bazzite-steam..."
+            sed -i 's|Exec=[^ ]*steam[^ ]*|Exec=bazzite-steam|g' "$autostart_file"
         fi
     fi
 
     # Patch desktop shortcut if it exists
     if [[ -f "$desktop_shortcut" ]]; then
-        if grep -q "/usr/local/bin/bazzite-steam" "$desktop_shortcut" 2>/dev/null; then
-            echo "  Desktop shortcut already uses /usr/local/bin/bazzite-steam"
+        if grep -q "bazzite-steam" "$desktop_shortcut" 2>/dev/null; then
+            echo "  Desktop shortcut already uses bazzite-steam"
         else
-            echo "  Patching desktop shortcut to use /usr/local/bin/bazzite-steam..."
-            sed -i 's|Exec=[^ ]*steam[^ ]*|Exec=/usr/local/bin/bazzite-steam|g' "$desktop_shortcut"
+            echo "  Patching desktop shortcut to use bazzite-steam..."
+            sed -i 's|Exec=[^ ]*steam[^ ]*|Exec=bazzite-steam|g' "$desktop_shortcut"
         fi
     fi
 }
