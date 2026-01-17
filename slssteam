@@ -432,12 +432,16 @@ install_slssteam() {
         return 0
     }
 
-    # Close Steam if running
+    # Check if Steam is running
     local steam_pid
     steam_pid=$(pgrep -x "steam" 2>/dev/null || true)
     if [ -n "$steam_pid" ]; then
-        echo -e "${YELLOW}Steam is running. Closing gracefully...${NC}"
-        close_steam
+        echo -e "${RED}Error: Steam is currently running${NC}"
+        echo ""
+        echo "Please close Steam completely before running this script."
+        echo "After closing Steam, run this script again."
+        echo ""
+        exit 1
     fi
 
     # Create directories
