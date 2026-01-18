@@ -75,6 +75,9 @@ if [ -f /etc/os-release ]; then
     source /etc/os-release
     if [ "$ID" = "bazzite" ]; then
         echo "  Bazzite detected - skipping fix-deps (handled by rpm-ostree)"
+    elif [ "$ID" = "void" ]; then
+        echo "  Void Linux detected - skipping auto fix-deps."
+        echo "  Please ensure dependencies (git, curl, tar, python3) are installed."
     else
         source "$SCRIPT_DIR/fix-deps"
     fi

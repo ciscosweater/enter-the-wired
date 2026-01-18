@@ -58,6 +58,12 @@ detect_distro_family() {
         return 0
     fi
 
+    # Void Linux
+   if [[ "$ID" == "void" ]]; then
+        echo "void"
+        return 0
+    fi 
+
     return 1
 }
 
@@ -100,6 +106,25 @@ install_packages() {
                 else
                     echo -e "  ${YELLOW}⊘${NC} $pkg (not found)"
                     skipped=$((skipped + 1))
+                fi
+                ;;
+            void)
+                # enable multilib if missing (needed for some packages)
+                if ! xbps-query -l | grep -q "void-repo-multilib"; then
+                    echo "Enabling void-repo-multilib for 32-bit support..."
+                    if command -v sudo &>/dev/null; then
+                        sudo xbps-install -y void-repo-multilib || true
+                        sudo xbps-install -Sy >/dev/null 2>&1
+                    else
+                        su -c "xbps-install -y void-repo-multilib 2>/dev/null || true && xbps-install -Sy >/dev/null 2>&1"
+                    fi
+                fi
+
+                # install packages
+                if command -v sudo &>/dev/null; then
+                    sudo xbps-install -y $packages
+                else
+                    su -c "xbps-install -y $packages"
                 fi
                 ;;
         esac
@@ -159,6 +184,9 @@ install_dependencies() {
         arch)
             install_packages "p7zip" "$FAMILY"
             ;;
+        void)
+            install_packages "p7zip 7zip" "$FAMILY"
+            ;;
     esac
 
     echo ""
@@ -178,6 +206,10 @@ install_dependencies() {
             ACCELA_PACKAGES="python xcb-util-cursor libnotify git"
             install_packages "$ACCELA_PACKAGES" "$FAMILY"
             ;;
+        void)
+            ACCELA_PACKAGES="python3 xcb-util-cursor libnotify git"
+            install_packages "$ACCELA_PACKAGES" "$FAMILY"
+            ;;
     esac
 
     echo ""
@@ -195,6 +227,10 @@ install_dependencies() {
             ;;
         arch)
             SLS_PACKAGES="lib32-glibc lib32-openssl lib32-curl curl"
+            install_packages "$SLS_PACKAGES" "$FAMILY"
+            ;;
+        void)
+            SLS_PACKAGES="libcurl-32bit openssl-32bit"
             install_packages "$SLS_PACKAGES" "$FAMILY"
             ;;
     esac

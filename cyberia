@@ -6,6 +6,10 @@ VENV_BASE="$HOME/.local/share/millennium/.venv"
 VENV_ACTIVATE="$VENV_BASE/bin/activate"
 PLUGINS_DIR="$HOME/.local/share/millennium/plugins"
 
+is_void() {
+    [ -f /etc/os-release ] && source /etc/os-release && [ "${ID:-}" = "void" ]
+}
+
 check_millennium() {
     [ -d "$HOME/.local/share/millennium" ]
 }

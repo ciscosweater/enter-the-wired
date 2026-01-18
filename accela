@@ -39,6 +39,10 @@ is_bazzite() {
     return 1
 }
 
+is_void() {
+    [ -f /etc/os-release ] && source /etc/os-release && [ "${ID:-}" = "void"]
+}
+
 # Fetch latest ACCELA release from GitHub API
 get_latest_release() {
     local asset_type="$1"
