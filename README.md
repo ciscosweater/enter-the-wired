@@ -1,14 +1,20 @@
 # Enter the Wired
 
-Universal installer for ACCELA and SLSsteam on Linux.
+> Universal installer for ACCELA and Steam patching tools on Linux and Windows.
 
 ## What is ACCELA?
 
 ACCELA is an open-source game client built with Python/.NET that provides various features for gaming on Linux.
 
+> **Important**: There is no single Developer of ACCELA. It materialized on its own from the internet. There are no public repos for the official version, only fork repos exist. Enter the Wired is an **installer only** and is not affiliated with ACCELA's development.
+
 ## What is SLSsteam?
 
 SLSsteam is a Steam plugin that enables playing games not owned in your Steam library. It uses LD_AUDIT injection to patch Steam at runtime without modifying Steam files.
+
+## What is GreenLuma?
+
+GreenLuma is a DLL injection tool for Windows that enables playing games not owned in your Steam library. It patches Steam at runtime by injecting a DLL.
 
 ## Quick Install (Linux)
 
@@ -45,7 +51,7 @@ irm https://raw.githubusercontent.com/ciscosweater/enter-the-wired/main/windows/
 
 ## Having Issues?
 
-If you have dependency issues:
+If you have Linux dependency issues:
 ```bash
 curl -fsSL https://raw.githubusercontent.com/ciscosweater/enter-the-wired/main/fix-deps | bash
 ```
@@ -73,6 +79,7 @@ curl -fsSL https://raw.githubusercontent.com/ciscosweater/enter-the-wired/main/f
 - **AceSLS** - SLSsteam developer
 - **JD Ros** - LD_AUDIT integration research
 - **Deadboy666** - Steam patch logic on Headcrab
+- **Steam006** - GreenLuma developer
 
 ## Repository
 
