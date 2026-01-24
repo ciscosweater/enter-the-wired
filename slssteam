@@ -102,17 +102,6 @@ find_steam_executable() {
 # STEAM MANAGEMENT
 # =============================================================================
 
-close_steam_graceful() {
-    local steam_exe
-    steam_exe=$(find_steam_executable 2>/dev/null) || {
-        echo "  Warning: Steam executable not found"
-        return 1
-    }
-
-    echo "  Closing Steam gracefully via steam://exit..."
-    $steam_exe -clearbeta steam://exit 2>/dev/null || true
-}
-
 run_steam_with_sls() {
     local steam_exe
 
@@ -314,24 +303,39 @@ prepare_steam() {
 
     echo "Preparing Steam for installation..."
 
-    # Remove steam.cfg to force update
-    [ -f "$steam_cfg" ] && rm -f "$steam_cfg" && echo "  Removed steam.cfg"
-
-    # Close Steam gracefully to allow update (without SLS)
-    if close_steam_graceful; then
-        echo "  Steam closing for update..."
-    elif is_steam_deck; then
-        echo "  Steam Deck detected"
-    else
-        echo "  Steam not found, will open Steam after installation"
+    # Check if steam.cfg exists
+    if [ -f "$steam_cfg" ]; then
+        echo -e "${YELLOW}Steam.cfg found${NC}"
+        echo "Removing steam.cfg..."
+        rm -f "$steam_cfg"
+        echo ""
+        echo -e "${YELLOW}=================================================================${NC}"
+        echo -e "${YELLOW}  PLEASE UPDATE THE STEAM CLIENT${NC}"
+        echo -e "${YELLOW}=================================================================${NC}"
+        echo ""
+        echo "1. Open the Steam client"
+        echo "2. Click the 'Steam' button in the top-left corner"
+        echo "3. Select 'Check for Steam Client Updates'"
+        echo "4. Wait for the update to complete"
+        echo "5. Run this script again after updating"
+        echo ""
+        echo "IMPORTANT: Make sure Steam is NOT in Beta mode"
+        echo "  - Go to Steam > Settings > Interface"
+        echo "  - Uncheck 'Participate in beta programs'"
+        echo ""
+        echo "Installation cancelled. Please run again after updating Steam."
+        exit 0
     fi
+
+    # If steam.cfg doesn't exist, continue normally
+    echo "steam.cfg not found, continuing installation..."
 
     # Create steam.cfg to skip self-update on next launch
     cat > "$steam_cfg" << 'EOF'
 BootStrapperInhibitAll=enable
 BootStrapperForceSelfUpdate=disable
 EOF
-    echo "  Created steam.cfg"
+    echo "  Created steam.cfg to disable auto-update"
 }
 
 # =============================================================================
@@ -347,10 +351,10 @@ install_slssteam() {
     echo -e "${GREEN}Cleaning up existing patches...${NC}"
     cleanup_ld_audit
 
-    # 2. PREPARATION - close Steam and open for update (without SLS)
+    # 2. PREPARATION - create steam.cfg and verify Steam is closed
     prepare_steam
 
-    # 3. Check if Steam closed
+    # 3. Check if Steam is closed (required for patching)
     local steam_pid
     steam_pid=$(pgrep -x "steam" 2>/dev/null || true)
     if [ -n "$steam_pid" ]; then
