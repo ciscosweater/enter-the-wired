@@ -356,7 +356,7 @@ install_slssteam() {
     local steam_pid
     steam_pid=$(pgrep -x "steam" 2>/dev/null || true)
     if [ -n "$steam_pid" ]; then
-        echo "  Steam still running, waiting..."
+        echo "  Steam still running, please close it..."
         sleep 10
         steam_pid=$(pgrep -x "steam" 2>/dev/null || true)
         if [ -n "$steam_pid" ]; then
