@@ -310,7 +310,7 @@ prepare_steam() {
         rm -f "$steam_cfg"
         echo ""
         echo -e "${YELLOW}=================================================================${NC}"
-        echo -e "${YELLOW}  PLEASE UPDATE THE STEAM CLIENT${NC}"
+        echo -e "${YELLOW}  PLEASE UPDATE THE STEAM CLIENT (OR IGNORE IF ITS ALREADY UP TO DATE AND RUN THE SCRIPT AGAIN!)${NC}"
         echo -e "${YELLOW}=================================================================${NC}"
         echo ""
         echo "1. Open the Steam client"
