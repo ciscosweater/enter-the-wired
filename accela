@@ -100,6 +100,18 @@ install_accela() {
         echo -e "${GREEN}[INFO] ACCELA is up to date (Version: $LOCAL_VERSION).${NC}"
         return 0
     fi
+
+    echo -e "\n${YELLOW}╔════════════════════════════════════════════╗"
+    echo -e "║           UPDATE AVAILABLE                 ║"
+    echo -e "╚════════════════════════════════════════════╝${NC}"
+    echo -e "  Current: ${RED}$LOCAL_VERSION${NC}"
+    echo -e "  Latest:  ${GREEN}$LATEST_TAG${NC}\n"
+
+    read -p "Do you want to proceed with the installation? [y/N] " confirm < /dev/tty
+    if [[ ! "$confirm" =~ ^[Yy]$ ]]; then
+        echo -e "\n${GREEN}[NOTE] Installation cancelled by user.${NC}"
+        return 0
+    fi
     ###
 
     echo -e "${GREEN}Installing ACCELA...${NC}"
@@ -226,7 +238,7 @@ install_accela() {
     rm -rf "$BUILD_DIR"
     ###
 
-    echo -e "${GREEN}ACCELA installed successfully!${NC}"
+    echo -e "${GREEN}[INFO] ACCELA $LATEST_TAG installed successfully!${NC}"
 }
 
 install_accela "$@"
