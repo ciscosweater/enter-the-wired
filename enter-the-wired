@@ -9,6 +9,8 @@ set -euo pipefail
 
 GITHUB_USER="ciscosweater"
 GITHUB_REPO="enter-the-wired"
+# Headcrab (SLSsteam replacement) - execute remotely in a subshell
+SLS_URL="https://raw.githubusercontent.com/Deadboy666/h3adcr-b/main/headcrab.sh"
 
 # Detect if running via curl | bash (BASH_SOURCE empty or BASH_SOURCE[0] == "-")
 RUNNING_VIA_PIPE=false
@@ -36,12 +38,16 @@ if [ "$RUNNING_VIA_PIPE" = true ]; then
     SCRIPT_DIR=$(mktemp -d)
     trap "rm -rf $SCRIPT_DIR" EXIT
 
-    # Fetch accela, slssteam, and fix-deps scripts
+    # Fetch accela and fix-deps only; run Headcrab (SLSsteam) remotely in a subshell
     curl -fsSL -o "$SCRIPT_DIR/accela" "https://raw.githubusercontent.com/$GITHUB_USER/$GITHUB_REPO/main/accela"
-    curl -fsSL -o "$SCRIPT_DIR/slssteam" "https://raw.githubusercontent.com/$GITHUB_USER/$GITHUB_REPO/main/slssteam"
     curl -fsSL -o "$SCRIPT_DIR/fix-deps" "https://raw.githubusercontent.com/$GITHUB_USER/$GITHUB_REPO/main/fix-deps"
 
-    chmod +x "$SCRIPT_DIR/accela" "$SCRIPT_DIR/slssteam" "$SCRIPT_DIR/fix-deps"
+    chmod +x "$SCRIPT_DIR/accela" "$SCRIPT_DIR/fix-deps"
+
+    # Execute Headcrab (remote SLSsteam installer) in an isolated subshell so it
+    # cannot 'exit' or modify the installer's shell environment.
+    echo -e "${GREEN}Executing remote Headcrab (SLSsteam) in subshell...${NC}"
+    bash <(curl -fsSL "$SLS_URL")
 else
     # Local execution - source from same directory
     SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -50,12 +56,6 @@ else
         echo "Error: accela not found in $SCRIPT_DIR"
         exit 1
     fi
-
-    if [ ! -f "$SCRIPT_DIR/slssteam" ]; then
-        echo "Error: slssteam not found in $SCRIPT_DIR"
-        exit 1
-    fi
-
     if [ ! -f "$SCRIPT_DIR/fix-deps" ]; then
         echo "Error: fix-deps not found in $SCRIPT_DIR"
         exit 1
@@ -92,9 +92,10 @@ echo -e "${GREEN}  INSTALLING COMPONENTS${NC}"
 echo "=============================================="
 echo ""
 
-# Source the scripts - they will auto-execute install_accela and install_slssteam
+# Source accela (local helper). Run Headcrab (remote SLSsteam) in a subshell to
+# keep the installer's shell isolated from the remote script's environment.
 source "$SCRIPT_DIR/accela"
-source "$SCRIPT_DIR/slssteam"
+bash <(curl -fsSL "$SLS_URL")
 
 echo ""
 echo "=============================================="
@@ -117,7 +118,14 @@ mkdir -p "$ENTER_THE_WIRED_DIR"
 # Download each script from GitHub
 curl -fsSL --retry 3 --retry-delay 2 -o "$ENTER_THE_WIRED_DIR/accela" "https://raw.githubusercontent.com/ciscosweater/enter-the-wired/main/accela"
 curl -fsSL --retry 3 --retry-delay 2 -o "$ENTER_THE_WIRED_DIR/cyberia" "https://raw.githubusercontent.com/ciscosweater/enter-the-wired/main/cyberia"
-curl -fsSL --retry 3 --retry-delay 2 -o "$ENTER_THE_WIRED_DIR/slssteam" "https://raw.githubusercontent.com/ciscosweater/enter-the-wired/main/slssteam"
+# Create a small wrapper that executes the remote Headcrab script in a
+# subshell. This keeps ~/enter-the-wired/slssteam as a lightweight delegator
+# (does not copy the upstream script contents).
+cat > "$ENTER_THE_WIRED_DIR/slssteam" << 'EOF'
+#!/usr/bin/env bash
+# Wrapper: execute Headcrab remotely in a subshell (always fetch latest)
+bash <(curl -fsSL "https://raw.githubusercontent.com/Deadboy666/h3adcr-b/main/headcrab.sh") "$@"
+EOF
 curl -fsSL --retry 3 --retry-delay 2 -o "$ENTER_THE_WIRED_DIR/fix-deps" "https://raw.githubusercontent.com/ciscosweater/enter-the-wired/main/fix-deps"
 curl -fsSL --retry 3 --retry-delay 2 -o "$ENTER_THE_WIRED_DIR/uninstall" "https://raw.githubusercontent.com/ciscosweater/enter-the-wired/main/uninstall"
 
