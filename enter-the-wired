@@ -32,6 +32,25 @@ else
     NC=''
 fi
 
+# Helper: best-effort detection of SLSsteam install directory. Returns
+# a sensible path if found, otherwise prints "unknown".
+get_sls_install_dir() {
+    # Common candidate locations (checked in order)
+    local candidates=(
+        "$HOME/.local/share/SLSsteam"
+        "$HOME/.var/app/com.valvesoftware.Steam/.local/share/SLSsteam"
+    )
+
+    for d in "${candidates[@]}"; do
+        if [ -d "${d}" ]; then
+            printf '%s' "${d}"
+            return 0
+        fi
+    done
+
+    printf 'unknown'
+}
+
 if [ "$RUNNING_VIA_PIPE" = true ]; then
     # Running via curl | bash - need to fetch scripts from GitHub
     echo -e "${GREEN}Detected pipe execution, fetching scripts from GitHub...${NC}"
@@ -166,9 +185,5 @@ echo "  ~/enter-the-wired/uninstall   - Remove all installations"
 echo ""
 echo "  If you have missing dependencies or ran into issues trying to use ACCELA or SLSsteam, run:"
 echo "  ~/enter-the-wired/fix-deps"
-echo ""
-echo -e "${YELLOW}About Cyberia:${NC}"
-echo "  Cyberia installs the Millennium framework and the Cyberia plugin,"
-echo "  which integrates ACCELA directly into the Steam client."
 echo ""
 echo "Protocol complete. Welcome to the Wired."
