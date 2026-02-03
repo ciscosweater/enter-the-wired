@@ -46,8 +46,13 @@ if [ "$RUNNING_VIA_PIPE" = true ]; then
 
     # Execute Headcrab (remote SLSsteam installer) in an isolated subshell so it
     # cannot 'exit' or modify the installer's shell environment.
-    echo -e "${GREEN}Executing remote Headcrab (SLSsteam) in subshell...${NC}"
-    bash <(curl -fsSL "$SLS_URL")
+    echo -e "${GREEN}Executing remote Headcrab (SLSsteam) in isolated temp script...${NC}"
+    tmp_headcrab_script=$(mktemp -t headcrab.XXXX.sh)
+    curl -fsSL "$SLS_URL" -o "$tmp_headcrab_script"
+    chmod +x "$tmp_headcrab_script"
+    # Execute the downloaded script so $0 and SCRIPT_DIR are real paths
+    bash "$tmp_headcrab_script"
+    rm -f "$tmp_headcrab_script"
 else
     # Local execution - source from same directory
     SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -95,7 +100,13 @@ echo ""
 # Source accela (local helper). Run Headcrab (remote SLSsteam) in a subshell to
 # keep the installer's shell isolated from the remote script's environment.
 source "$SCRIPT_DIR/accela"
-bash <(curl -fsSL "$SLS_URL")
+# Execute Headcrab via a temporary downloaded script so it can determine its
+# real script directory (avoids /proc/.../fd/ issues from process substitution)
+tmp_headcrab_script=$(mktemp -t headcrab.XXXX.sh)
+curl -fsSL "$SLS_URL" -o "$tmp_headcrab_script"
+chmod +x "$tmp_headcrab_script"
+bash "$tmp_headcrab_script" "$@"
+rm -f "$tmp_headcrab_script"
 
 echo ""
 echo "=============================================="
@@ -123,8 +134,12 @@ curl -fsSL --retry 3 --retry-delay 2 -o "$ENTER_THE_WIRED_DIR/cyberia" "https://
 # (does not copy the upstream script contents).
 cat > "$ENTER_THE_WIRED_DIR/slssteam" << 'EOF'
 #!/usr/bin/env bash
-# Wrapper: execute Headcrab remotely in a subshell (always fetch latest)
-bash <(curl -fsSL "https://raw.githubusercontent.com/Deadboy666/h3adcr-b/main/headcrab.sh") "$@"
+# Wrapper: download Headcrab to a temp file and execute it (ensures SCRIPT_DIR)
+tmp_headcrab_script=$(mktemp -t headcrab.XXXX.sh)
+curl -fsSL "https://raw.githubusercontent.com/Deadboy666/h3adcr-b/main/headcrab.sh" -o "$tmp_headcrab_script"
+chmod +x "$tmp_headcrab_script"
+bash "$tmp_headcrab_script" "$@"
+rm -f "$tmp_headcrab_script"
 EOF
 curl -fsSL --retry 3 --retry-delay 2 -o "$ENTER_THE_WIRED_DIR/fix-deps" "https://raw.githubusercontent.com/ciscosweater/enter-the-wired/main/fix-deps"
 curl -fsSL --retry 3 --retry-delay 2 -o "$ENTER_THE_WIRED_DIR/uninstall" "https://raw.githubusercontent.com/ciscosweater/enter-the-wired/main/uninstall"
