@@ -19,7 +19,13 @@ fi
 
 # Configuration
 GITHUB_REPO="ciscosweater/enter-the-wired"
-INSTALL_DIR="$HOME/accela"
+INSTALL_DIR="$HOME/.local/share/ACCELA"
+
+### global variables for cross-function communication
+LATEST_TAG=""
+RELEASE_JSON=""
+SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
+###
 
 # Check if running on SteamOS (uses AppImage)
 is_steamos() {
@@ -40,15 +46,26 @@ is_bazzite() {
     return 1
 }
 
+### fetch api data once and store in global variables
+fetch_api_data() {
+    echo -n -e "${YELLOW}[WAIT]${NC} Fetching latest release info from GitHub... " >&2
+    if ! RELEASE_JSON=$(curl -f -sSL --connect-timeout 10 "https://api.github.com/repos/$GITHUB_REPO/releases/latest" 2>/dev/null); then
+        echo -e "${RED}FAILED${NC}" >&2
+        return 1
+    fi
+    LATEST_TAG=$(echo "$RELEASE_JSON" | grep -m 1 '"tag_name":' | sed -E 's/.*"tag_name": *"([^"]+)".*/\1/')
+    echo -e "${GREEN}DONE!${NC}" >&2
+}
+###
+
 # Fetch latest ACCELA release from GitHub API
 get_latest_release() {
     local asset_type="$1"
     local release_info
 
-    echo "Fetching latest ACCELA release info..." >&2
-
-    # Fetch release data from GitHub API
-    release_info=$(curl -sSL "https://api.github.com/repos/$GITHUB_REPO/releases/latest")
+    ### use the globally fetched json
+    release_info="$RELEASE_JSON"
+    ###
 
     if [ -z "$release_info" ] || echo "$release_info" | grep -q '"message":'; then
         echo -e "${RED}Error fetching release info from GitHub API${NC}"
@@ -72,6 +89,31 @@ get_latest_release() {
 
 # Install ACCELA
 install_accela() {
+    ### version check logic before installation
+    local LOCAL_VERSION_FILE="$INSTALL_DIR/.version"
+    local LOCAL_VERSION="None"
+    [ -f "$LOCAL_VERSION_FILE" ] && LOCAL_VERSION=$(cat "$LOCAL_VERSION_FILE")
+
+    if ! fetch_api_data; then return 1; fi
+
+    if [ "$LOCAL_VERSION" == "$LATEST_TAG" ]; then
+        echo -e "${GREEN}[INFO] ACCELA is up to date (Version: $LOCAL_VERSION).${NC}"
+        return 0
+    fi
+
+    echo -e "\n${YELLOW}╔════════════════════════════════════════════╗"
+    echo -e "║           UPDATE AVAILABLE                 ║"
+    echo -e "╚════════════════════════════════════════════╝${NC}"
+    echo -e "  Current: ${RED}$LOCAL_VERSION${NC}"
+    echo -e "  Latest:  ${GREEN}$LATEST_TAG${NC}\n"
+
+    read -p "Do you want to proceed with the installation? [y/N] " confirm < /dev/tty
+    if [[ ! "$confirm" =~ ^[Yy]$ ]]; then
+        echo -e "\n${GREEN}[NOTE] Installation cancelled by user.${NC}"
+        return 0
+    fi
+    ###
+
     echo -e "${GREEN}Installing ACCELA...${NC}"
     echo ""
 
@@ -113,7 +155,9 @@ install_accela() {
         return 1
     fi
 
-    LOCAL_ARCHIVE=$(find . -maxdepth 1 -name "ACCELA*.tar.gz" -type f 2>/dev/null | head -1 || true)
+    ### check for local archive in the script directory
+    LOCAL_ARCHIVE=$(find "$SCRIPT_DIR" -maxdepth 1 -name "ACCELA*.tar.gz" -type f 2>/dev/null | head -1 || true)
+    ###
 
     if [ -n "$LOCAL_ARCHIVE" ]; then
         echo "Found local archive: $LOCAL_ARCHIVE"
@@ -147,17 +191,21 @@ install_accela() {
     rm -rf "$INSTALL_DIR"/*
 
     echo "Extracting archive..."
-    if ! tar -xzf "$TEMP_ARCHIVE" -C "$INSTALL_DIR"; then
+    ### use a temporary build directory for extraction
+    local BUILD_DIR=$(mktemp -d)
+    if ! tar -xzf "$TEMP_ARCHIVE" -C "$BUILD_DIR"; then
         echo -e "${RED}Error extracting archive. Download may be corrupted.${NC}"
         rm -f "$TEMP_ARCHIVE" 2>/dev/null
+        rm -rf "$BUILD_DIR"
         return 1
     fi
-    rm "$TEMP_ARCHIVE"
+    [ -z "$LOCAL_ARCHIVE" ] && rm "$TEMP_ARCHIVE"
 
-    if ! cd "$INSTALL_DIR"; then
-        echo -e "${RED}Error: Could not access $INSTALL_DIR${NC}"
+    if ! cd "$BUILD_DIR"; then
+        echo -e "${RED}Error: Could not access temporary build directory${NC}"
         return 1
     fi
+    ###
 
     echo "Making installer executable..."
     if [ -f "./ACCELAINSTALL" ]; then
@@ -167,19 +215,30 @@ install_accela() {
         export SKIPVENV="${SKIPVENV:-0}"
         if ! ./ACCELAINSTALL; then
             echo -e "${RED}Error running ACCELAINSTALL.${NC}"
+            ### cleanup build dir even on failure
+            rm -rf "$BUILD_DIR"
+            ###
             return 1
         fi
+        ### persist version info after successful run
+        echo "$LATEST_TAG" > "$LOCAL_VERSION_FILE"
+        ###
     else
         echo -e "${RED}Error: 'ACCELAINSTALL' not found in extracted folder.${NC}"
         ls -la
+        ### cleanup
+        rm -rf "$BUILD_DIR"
+        ###
         return 1
     fi
 
     # Clean up installer directory
     echo "Cleaning up temporary files..."
-    rm -rf "$INSTALL_DIR"
+    ### remove the temporary build directory
+    rm -rf "$BUILD_DIR"
+    ###
 
-    echo -e "${GREEN}ACCELA installed successfully!${NC}"
+    echo -e "${GREEN}[INFO] ACCELA $LATEST_TAG installed successfully!${NC}"
 }
 
 install_accela "$@"

@@ -1,5 +1,6 @@
 #!/bin/bash
-set -euo pipefail
+### disabled set -e so the script keeps going even if a file is missing
+set -uo pipefail
 
 # Colors (disabled if not interactive terminal)
 if [ -t 1 ] && [ -t 0 ]; then
@@ -82,14 +83,15 @@ find_steam_directory() {
 is_bazzite() {
     if [ -f /etc/os-release ]; then
         source /etc/os-release
-        [[ "$ID" == "bazzite" ]] && return 0
+        [[ "${ID:-}" == "bazzite" ]] && return 0
     fi
     return 1
 }
 
 # --- Cleanup LD_AUDIT patches and wrappers ---
 cleanup_ld_audit() {
-    echo "Cleaning up existing LD_AUDIT patches..."
+    ### use yellow for warning as requested
+    echo -e "${YELLOW}[WARNING] Cleaning up LD_AUDIT patches...${NC}"
 
     # Clean steam.sh (all possible locations)
     for steam_sh in \
@@ -100,7 +102,8 @@ cleanup_ld_audit() {
         "/usr/share/steam/steam.sh"; do
         if [ -f "$steam_sh" ]; then
             if grep -q "LD_AUDIT.*SLSsteam" "$steam_sh" 2>/dev/null; then
-                sed -i '/export LD_AUDIT.*SLSsteam/d' "$steam_sh"
+                ### use sudo as fallback if file is locked
+                sudo sed -i '/export LD_AUDIT.*SLSsteam/d' "$steam_sh" 2>/dev/null || sed -i '/export LD_AUDIT.*SLSsteam/d' "$steam_sh"
                 echo "  Cleaned: $steam_sh"
             fi
         fi
@@ -129,34 +132,67 @@ cleanup_ld_audit() {
         echo "  Removed backup: /usr/bin/steam-jupiter.bak"
     fi
 
-    echo "Cleanup complete!"
+    ### simple green done message
+    echo -e "${GREEN}[DONE] Cleanup complete!${NC}"
 }
 
 # --- Cleanup SLSsteam configuration and desktop files ---
 cleanup_slssteam() {
-    echo "Cleaning up SLSsteam configuration..."
+    ### starting shortcut and config cleanup
+    echo -e "${YELLOW}[WARNING] Cleaning up configuration and shortcuts...${NC}"
 
-    local desktop_shortcut="$HOME/.local/share/applications/steam.desktop"
     local autostart_file="$HOME/.config/autostart/steam.desktop"
 
-    # Remove desktop shortcut override (system shortcut will be used again)
-    if [[ -f "$desktop_shortcut" ]]; then
-        rm -f "$desktop_shortcut"
-        echo "  Removed desktop shortcut override."
+    ### forced removal of all annoying leftovers and localized desktops
+    rm -f "$HOME/.local/share/applications/steam.desktop"
+    rm -f "$HOME/.local/share/applications/accela.desktop"
+    rm -f "$HOME/.local/share/applications/ACCELA.desktop"
+    rm -f "$HOME/.local/share/accela.desktop"
+    rm -f "$HOME/.local/bin/accela-update"
+    rm -f "$HOME/.local/bin/accela"
+
+    local desktop_folders=("$HOME/Desktop" "$HOME/Área de Trabalho" "$(xdg-user-dir DESKTOP 2>/dev/null || echo "$HOME/Desktop")")
+    for folder in "${desktop_folders[@]}"; do
+        if [ -d "$folder" ]; then
+            rm -f "$folder/steam.desktop" "$folder/accela.desktop" "$folder/ACCELA.desktop"
+        fi
+    done
+
+    # Remove ACCELA and SLSsteam directories
+    local dirs_to_remove=(
+        "$HOME/.local/share/ACCELA"
+        "$HOME/.local/share/SLSsteam"
+        "$HOME/.config/SLSsteam"
+        "$HOME/.var/app/com.valvesoftware.Steam/.local/share/SLSsteam"
+        "$HOME/.var/app/com.valvesoftware.Steam/.config/SLSsteam"
+    )
+
+    for dir in "${dirs_to_remove[@]}"; do
+        if [ -d "$dir" ]; then
+            rm -rf "$dir"
+            echo "  Removed: $dir"
+        fi
+    done
+
+    # Remove steam.cfg (created by SLSsteam to block updates)
+    local steam_cfg_dir=$(find_steam_directory 2>/dev/null || true)
+    if [[ -n "$steam_cfg_dir" ]] && [[ -f "$steam_cfg_dir/steam.cfg" ]]; then
+        rm -f "$steam_cfg_dir/steam.cfg"
+        echo "  Removed steam.cfg"
     fi
 
     # Restore autostart to use correct Steam executable
     if [[ -f "$autostart_file" ]]; then
         if is_bazzite; then
-            # On Bazzite, use bazzite-steam wrapper
             sed -i 's|Exec=[^ ]*steam[^ ]*|Exec=bazzite-steam|g' "$autostart_file"
-            echo "  Restored autostart to use bazzite-steam."
         else
-            # On other systems, use system steam
             sed -i 's|Exec=[^ ]*steam[^ ]*|Exec=/usr/bin/steam|g' "$autostart_file"
-            echo "  Restored autostart to use /usr/bin/steam."
         fi
+        echo "  Restored autostart executable."
     fi
+
+    ### final done message for uninstallation
+    echo -e "${GREEN}[DONE] Uninstallation completed!${NC}"
 }
 
 # Find steam.sh location for debugging
@@ -182,90 +218,11 @@ echo ""
 steam_sh_location=$(find_steam_sh 2>/dev/null || true)
 if [ -n "$steam_sh_location" ]; then
     echo "Found steam.sh at: $steam_sh_location"
-    if grep -q "LD_AUDIT" "$steam_sh_location" 2>/dev/null; then
-        echo "  steam.sh contains LD_AUDIT entries:"
-        grep "LD_AUDIT" "$steam_sh_location" | sed 's/^/    /'
-    fi
-else
-    echo "Warning: steam.sh not found in any standard location"
 fi
-echo ""
 
-# Cleanup LD_AUDIT patches and wrappers first
+# Execution
 cleanup_ld_audit
-echo ""
-
-# Cleanup SLSsteam configuration and desktop files
 cleanup_slssteam
-echo ""
-
-# Remove steam.cfg (created by SLSsteam to block updates)
-steam_cfg_dir=$(find_steam_directory 2>/dev/null || true)
-if [[ -n "$steam_cfg_dir" ]] && [[ -f "$steam_cfg_dir/steam.cfg" ]]; then
-    rm -f "$steam_cfg_dir/steam.cfg"
-    echo "Removed steam.cfg"
-fi
-
-# Remove ACCELA
-ACCELA_DIR="$HOME/.local/share/ACCELA"
-if [ -d "$ACCELA_DIR" ]; then
-	rm -rf "$ACCELA_DIR"
-	if [ ! -d "$ACCELA_DIR" ]; then
-		echo "ACCELA removed successfully."
-	else
-		echo "Error: Failed to remove ACCELA." >&2
-	fi
-else
-	echo "ACCELA directory not found. Skipping..."
-fi
-
-ACCELA_DESKTOP="$HOME/.local/share/applications/ACCELA.desktop"
-if [ -f "$ACCELA_DESKTOP" ]; then
-	rm -f "$ACCELA_DESKTOP"
-	if [ ! -f "$ACCELA_DESKTOP" ]; then
-		echo "ACCELA desktop shortcut removed."
-	else
-		echo "Error: Failed to remove ACCELA desktop shortcut." >&2
-	fi
-else
-	echo "ACCELA desktop shortcut not found. Skipping..."
-fi
-
-# Remove SLSsteam (Share and Config)
-SLS_SHARE="$HOME/.local/share/SLSsteam"
-SLS_CONFIG="$HOME/.config/SLSsteam"
-FLATPAK_SLS_SHARE="$HOME/.var/app/com.valvesoftware.Steam/.local/share/SLSsteam"
-FLATPAK_SLS_CONFIG="$HOME/.var/app/com.valvesoftware.Steam/.config/SLSsteam"
-FOUND_SLS=0
-
-for dir in "$SLS_SHARE" "$SLS_CONFIG" "$FLATPAK_SLS_SHARE" "$FLATPAK_SLS_CONFIG"; do
-	if [ -d "$dir" ]; then
-		rm -rf "$dir"
-		if [ ! -d "$dir" ]; then
-			echo "Removed: $dir"
-			FOUND_SLS=1
-		else
-			echo "Error: Failed to remove $dir" >&2
-		fi
-	fi
-done
-
-if [ $FOUND_SLS -eq 0 ]; then
-	echo "No SLSsteam directories found. Skipping..."
-fi
 
 echo ""
-
-# Final verification: check if steam.sh still has LD_AUDIT
-steam_sh_location=$(find_steam_sh 2>/dev/null || true)
-if [ -n "$steam_sh_location" ] && grep -q "LD_AUDIT.*SLSsteam" "$steam_sh_location" 2>/dev/null; then
-    echo -e "${YELLOW}Warning: steam.sh still contains LD_AUDIT entries!${NC}"
-    echo "  File: $steam_sh_location"
-    echo "  Please manually edit this file and remove the LD_AUDIT line."
-    echo "  Or run: sed -i '/export LD_AUDIT.*SLSsteam/d' $steam_sh_location"
-else
-    echo "Verification: steam.sh is clean (no LD_AUDIT entries found)"
-fi
-
-echo ""
-echo -e "${GREEN}Uninstallation completed. Reboot recommended.${NC}"
+echo -e "${GREEN}Process finished. Reboot recommended.${NC}"
