@@ -189,7 +189,7 @@ function Install-GreenLumaWindows {
     New-Item -ItemType Directory -Path $tempDir -Force | Out-Null
 
     $zipPath = Join-Path $tempDir "greenluma.zip"
-    Invoke-WebDownload -Url "https://files.catbox.moe/rpi7fv.zip" -OutputPath $zipPath
+    Invoke-WebDownload -Url "https://files.catbox.moe/l1kds4.zip" -OutputPath $zipPath
 
     # Extract zip
     Write-Status "Extracting GreenLuma..." -Type Info
