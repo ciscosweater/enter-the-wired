@@ -10,6 +10,9 @@ set -euo pipefail
 GITHUB_USER="ciscosweater"
 GITHUB_REPO="enter-the-wired"
 
+# Headcrab (SLSsteam replacement) - execute remotely in a subshell
+SLS_URL="https://raw.githubusercontent.com/Deadboy666/h3adcr-b/main/headcrab.sh"
+
 # Detect if running via curl | bash (BASH_SOURCE empty or BASH_SOURCE[0] == "-")
 RUNNING_VIA_PIPE=false
 if [ -z "${BASH_SOURCE:-}" ] || [ ${#BASH_SOURCE[@]} -eq 0 ] || [[ "${BASH_SOURCE[0]:-}" == "-" ]]; then
@@ -29,6 +32,25 @@ else
     NC=''
 fi
 
+# Helper: best-effort detection of SLSsteam install directory. Returns
+# a sensible path if found, otherwise prints "unknown".
+get_sls_install_dir() {
+    # Common candidate locations (checked in order)
+    local candidates=(
+        "$HOME/.local/share/SLSsteam"
+        "$HOME/.var/app/com.valvesoftware.Steam/.local/share/SLSsteam"
+    )
+
+    for d in "${candidates[@]}"; do
+        if [ -d "${d}" ]; then
+            printf '%s' "${d}"
+            return 0
+        fi
+    done
+
+    printf 'unknown'
+}
+
 if [ "$RUNNING_VIA_PIPE" = true ]; then
     # Running via curl | bash - need to fetch scripts from GitHub
     echo -e "${GREEN}Detected pipe execution, fetching scripts from GitHub...${NC}"
@@ -36,12 +58,16 @@ if [ "$RUNNING_VIA_PIPE" = true ]; then
     SCRIPT_DIR=$(mktemp -d)
     trap "rm -rf $SCRIPT_DIR" EXIT
 
-    # Fetch accela, slssteam, and fix-deps scripts
+    # Fetch accela and fix-deps only; run Headcrab (SLSsteam) remotely in a subshell
     curl -fsSL -o "$SCRIPT_DIR/accela" "https://raw.githubusercontent.com/$GITHUB_USER/$GITHUB_REPO/main/accela"
-    curl -fsSL -o "$SCRIPT_DIR/slssteam" "https://raw.githubusercontent.com/$GITHUB_USER/$GITHUB_REPO/main/slssteam"
     curl -fsSL -o "$SCRIPT_DIR/fix-deps" "https://raw.githubusercontent.com/$GITHUB_USER/$GITHUB_REPO/main/fix-deps"
 
-    chmod +x "$SCRIPT_DIR/accela" "$SCRIPT_DIR/slssteam" "$SCRIPT_DIR/fix-deps"
+    chmod +x "$SCRIPT_DIR/accela" "$SCRIPT_DIR/fix-deps"
+
+    # Defer Headcrab execution until after other components are installed.
+    # When running via pipe we fetch helpers only; Headcrab will be executed
+    # later in the installer so it runs as the final step and only once.
+    echo -e "${GREEN}Deferring Headcrab execution until after installations...${NC}"
 else
     # Local execution - source from same directory
     SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -50,12 +76,6 @@ else
         echo "Error: accela not found in $SCRIPT_DIR"
         exit 1
     fi
-
-    if [ ! -f "$SCRIPT_DIR/slssteam" ]; then
-        echo "Error: slssteam not found in $SCRIPT_DIR"
-        exit 1
-    fi
-
     if [ ! -f "$SCRIPT_DIR/fix-deps" ]; then
         echo "Error: fix-deps not found in $SCRIPT_DIR"
         exit 1
@@ -92,9 +112,17 @@ echo -e "${GREEN}  INSTALLING COMPONENTS${NC}"
 echo "=============================================="
 echo ""
 
-# Source the scripts - they will auto-execute install_accela and install_slssteam
+# Source accela (local helper). Run Headcrab (remote SLSsteam) in a subshell to
+# keep the installer's shell isolated from the remote script's environment.
 source "$SCRIPT_DIR/accela"
-source "$SCRIPT_DIR/slssteam"
+
+# Execute Headcrab via a temporary downloaded script so it can determine its
+# real script directory (avoids /proc/.../fd/ issues from process substitution)
+tmp_headcrab_script=$(mktemp -t headcrab.XXXX.sh)
+curl -fsSL "$SLS_URL" -o "$tmp_headcrab_script"
+chmod +x "$tmp_headcrab_script"
+bash "$tmp_headcrab_script" "$@"
+rm -f "$tmp_headcrab_script"
 
 echo ""
 echo "=============================================="
@@ -116,7 +144,15 @@ mkdir -p "$ENTER_THE_WIRED_DIR"
 
 # Download each script from GitHub
 curl -fsSL --retry 3 --retry-delay 2 -o "$ENTER_THE_WIRED_DIR/accela" "https://raw.githubusercontent.com/ciscosweater/enter-the-wired/main/accela"
-curl -fsSL --retry 3 --retry-delay 2 -o "$ENTER_THE_WIRED_DIR/slssteam" "https://raw.githubusercontent.com/ciscosweater/enter-the-wired/main/slssteam"
+cat > "$ENTER_THE_WIRED_DIR/slssteam" << 'EOF'
+#!/usr/bin/env bash
+# Wrapper: download Headcrab to a temp file and execute it (ensures SCRIPT_DIR)
+tmp_headcrab_script=$(mktemp -t headcrab.XXXX.sh)
+curl -fsSL "https://raw.githubusercontent.com/Deadboy666/h3adcr-b/main/headcrab.sh" -o "$tmp_headcrab_script"
+chmod +x "$tmp_headcrab_script"
+bash "$tmp_headcrab_script" "$@"
+rm -f "$tmp_headcrab_script"
+EOF
 curl -fsSL --retry 3 --retry-delay 2 -o "$ENTER_THE_WIRED_DIR/fix-deps" "https://raw.githubusercontent.com/ciscosweater/enter-the-wired/main/fix-deps"
 curl -fsSL --retry 3 --retry-delay 2 -o "$ENTER_THE_WIRED_DIR/uninstall" "https://raw.githubusercontent.com/ciscosweater/enter-the-wired/main/uninstall"
 
