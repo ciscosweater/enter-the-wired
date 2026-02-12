@@ -116,14 +116,12 @@ mkdir -p "$ENTER_THE_WIRED_DIR"
 
 # Download each script from GitHub
 curl -fsSL --retry 3 --retry-delay 2 -o "$ENTER_THE_WIRED_DIR/accela" "https://raw.githubusercontent.com/ciscosweater/enter-the-wired/main/accela"
-curl -fsSL --retry 3 --retry-delay 2 -o "$ENTER_THE_WIRED_DIR/cyberia" "https://raw.githubusercontent.com/ciscosweater/enter-the-wired/main/cyberia"
 curl -fsSL --retry 3 --retry-delay 2 -o "$ENTER_THE_WIRED_DIR/slssteam" "https://raw.githubusercontent.com/ciscosweater/enter-the-wired/main/slssteam"
 curl -fsSL --retry 3 --retry-delay 2 -o "$ENTER_THE_WIRED_DIR/fix-deps" "https://raw.githubusercontent.com/ciscosweater/enter-the-wired/main/fix-deps"
 curl -fsSL --retry 3 --retry-delay 2 -o "$ENTER_THE_WIRED_DIR/uninstall" "https://raw.githubusercontent.com/ciscosweater/enter-the-wired/main/uninstall"
 
 # Set execute permissions (ignore if files don't exist)
 chmod +x "$ENTER_THE_WIRED_DIR/accela" 2>/dev/null || true
-chmod +x "$ENTER_THE_WIRED_DIR/cyberia" 2>/dev/null || true
 chmod +x "$ENTER_THE_WIRED_DIR/slssteam" 2>/dev/null || true
 chmod +x "$ENTER_THE_WIRED_DIR/fix-deps" 2>/dev/null || true
 chmod +x "$ENTER_THE_WIRED_DIR/uninstall" 2>/dev/null || true
@@ -142,16 +140,11 @@ echo -e "${YELLOW}  LOCAL SCRIPTS AVAILABLE${NC}"
 echo "=============================================="
 echo ""
 echo "  ~/enter-the-wired/accela      - Install/upgrade ACCELA"
-echo "  ~/enter-the-wired/cyberia     - Install Millennium + Steam integration"
 echo "  ~/enter-the-wired/slssteam    - Install Steam Linux Runtime"
 echo "  ~/enter-the-wired/fix-deps     - Fix missing system dependencies"
 echo "  ~/enter-the-wired/uninstall   - Remove all installations"
 echo ""
 echo "  If you have missing dependencies or ran into issues trying to use ACCELA or SLSsteam, run:"
 echo "  ~/enter-the-wired/fix-deps"
-echo ""
-echo -e "${YELLOW}About Cyberia:${NC}"
-echo "  Cyberia installs the Millennium framework and the Cyberia plugin,"
-echo "  which integrates ACCELA directly into the Steam client."
 echo ""
 echo "Protocol complete. Welcome to the Wired."
