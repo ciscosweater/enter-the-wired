@@ -27,6 +27,161 @@ RELEASE_JSON=""
 SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
 ###
 
+# Ensure ACCELA.conf has required [General] fields
+ensure_accela_conf_general() {
+    local CONF_PATH="$HOME/.config/Tachibana Labs/ACCELA.conf"
+    local CONF_DIR
+    local TMP_FILE
+
+    CONF_DIR="$(dirname "$CONF_PATH")"
+    if ! mkdir -p "$CONF_DIR" 2>/dev/null; then
+        echo -e "${YELLOW}[WARN] Could not create config directory: $CONF_DIR${NC}" >&2
+        return 0
+    fi
+
+    if [ ! -f "$CONF_PATH" ]; then
+        if ! cat > "$CONF_PATH" <<'EOF'
+[General]
+auto_skip_single_choice=true
+library_mode=true
+max_downloads=16
+sls_config_management=true
+slssteam_mode=true
+use_steamless=true
+EOF
+        then
+            echo -e "${YELLOW}[WARN] Could not write config file: $CONF_PATH${NC}" >&2
+            return 0
+        fi
+        return 0
+    fi
+
+    TMP_FILE="$(mktemp)"
+    if [ -z "$TMP_FILE" ] || [ ! -f "$TMP_FILE" ]; then
+        echo -e "${YELLOW}[WARN] Could not create temporary file for config update.${NC}" >&2
+        return 0
+    fi
+
+    if ! awk '
+BEGIN {
+    in_general = 0
+    saw_general = 0
+    saw_auto_skip_single_choice = 0
+    saw_library_mode = 0
+    saw_max_downloads = 0
+    saw_sls_config_management = 0
+    saw_slssteam_mode = 0
+    saw_use_steamless = 0
+}
+
+function print_required_missing() {
+    if (!saw_auto_skip_single_choice) print "auto_skip_single_choice=true"
+    if (!saw_library_mode) print "library_mode=true"
+    if (!saw_max_downloads) print "max_downloads=16"
+    if (!saw_sls_config_management) print "sls_config_management=true"
+    if (!saw_slssteam_mode) print "slssteam_mode=true"
+    if (!saw_use_steamless) print "use_steamless=true"
+}
+
+/^\[[^]]+\]$/ {
+    if (in_general) {
+        print_required_missing()
+        in_general = 0
+    }
+
+    if ($0 == "[General]") {
+        saw_general = 1
+        in_general = 1
+        saw_auto_skip_single_choice = 0
+        saw_library_mode = 0
+        saw_max_downloads = 0
+        saw_sls_config_management = 0
+        saw_slssteam_mode = 0
+        saw_use_steamless = 0
+    }
+
+    print $0
+    next
+}
+
+{
+    if (in_general) {
+        if ($0 ~ /^auto_skip_single_choice[[:space:]]*=/) {
+            if (!saw_auto_skip_single_choice) {
+                print "auto_skip_single_choice=true"
+                saw_auto_skip_single_choice = 1
+            }
+            next
+        }
+        if ($0 ~ /^library_mode[[:space:]]*=/) {
+            if (!saw_library_mode) {
+                print "library_mode=true"
+                saw_library_mode = 1
+            }
+            next
+        }
+        if ($0 ~ /^max_downloads[[:space:]]*=/) {
+            if (!saw_max_downloads) {
+                print "max_downloads=16"
+                saw_max_downloads = 1
+            }
+            next
+        }
+        if ($0 ~ /^sls_config_management[[:space:]]*=/) {
+            if (!saw_sls_config_management) {
+                print "sls_config_management=true"
+                saw_sls_config_management = 1
+            }
+            next
+        }
+        if ($0 ~ /^slssteam_mode[[:space:]]*=/) {
+            if (!saw_slssteam_mode) {
+                print "slssteam_mode=true"
+                saw_slssteam_mode = 1
+            }
+            next
+        }
+        if ($0 ~ /^use_steamless[[:space:]]*=/) {
+            if (!saw_use_steamless) {
+                print "use_steamless=true"
+                saw_use_steamless = 1
+            }
+            next
+        }
+    }
+
+    print $0
+}
+
+END {
+    if (in_general) {
+        print_required_missing()
+    } else if (!saw_general) {
+        print ""
+        print "[General]"
+        print "auto_skip_single_choice=true"
+        print "library_mode=true"
+        print "max_downloads=16"
+        print "sls_config_management=true"
+        print "slssteam_mode=true"
+        print "use_steamless=true"
+    }
+}
+' "$CONF_PATH" > "$TMP_FILE"; then
+        rm -f "$TMP_FILE" 2>/dev/null
+        echo -e "${YELLOW}[WARN] Could not process config file: $CONF_PATH${NC}" >&2
+        return 0
+    fi
+
+    if ! mv "$TMP_FILE" "$CONF_PATH" 2>/dev/null; then
+        rm -f "$TMP_FILE" 2>/dev/null
+        echo -e "${YELLOW}[WARN] Could not update config file: $CONF_PATH${NC}" >&2
+        return 0
+    fi
+
+    return 0
+}
+
 # Check if running on SteamOS (uses AppImage)
 is_steamos() {
     if [ -f /etc/os-release ]; then
@@ -98,6 +253,7 @@ install_accela() {
 
     if [ "$LOCAL_VERSION" == "$LATEST_TAG" ]; then
         echo -e "${GREEN}[INFO] ACCELA is up to date (Version: $LOCAL_VERSION).${NC}"
+        ensure_accela_conf_general
         return 0
     fi
 
@@ -222,6 +378,7 @@ install_accela() {
         fi
         ### persist version info after successful run
         echo "$LATEST_TAG" > "$LOCAL_VERSION_FILE"
+        ensure_accela_conf_general
         ###
     else
         echo -e "${RED}Error: 'ACCELAINSTALL' not found in extracted folder.${NC}"
@@ -239,6 +396,7 @@ install_accela() {
     ###
 
     echo -e "${GREEN}[INFO] ACCELA $LATEST_TAG installed successfully!${NC}"
+    return 0
 }
 
 install_accela "$@"
