@@ -12,6 +12,17 @@ ACCELA is an open-source game client built with Python/.NET that provides variou
 
 SLSsteam is a Steam plugin that enables playing games not owned in your Steam library. It uses LD_AUDIT injection to patch Steam at runtime without modifying Steam files.
 
+### Headcrab (h3adcr-b) — Deadboy666
+
+This installer now uses Deadboy666's headcrab (h3adcr-b) to install and configure SLSsteam automatically.
+
+- **What it does:** `h3adcr-b` automates fetching, installing and configuring the SLSsteam runtime patch (LD_AUDIT) and applies the necessary Steam hooks without modifying Steam binaries.
+- **Why we use it:** it standardizes setup across distributions, handles Steam-specific edge-cases, and is actively maintained upstream.
+- **Upstream repo:** https://github.com/Deadboy666/h3adcr-b
+- **Security note:** the installer invokes the headcrab tooling; review the upstream README and code if you require an audit before running.
+
+The Enter the Wired scripts call `h3adcr-b` as part of the `slssteam` install flow so SLSsteam is installed and configured consistently across supported platforms.
+
 ## Quick Install (Linux)
 
 ```bash
