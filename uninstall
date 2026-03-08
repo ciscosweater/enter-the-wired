@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 ### disabled set -e so the script keeps going even if a file is missing
 set -uo pipefail
 
