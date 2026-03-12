@@ -2,7 +2,8 @@
   description = "Enter The Wired";
 
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    # Pinned for reproducibility. Update this revision explicitly when needed.
+    nixpkgs.url = "github:NixOS/nixpkgs/9dcb002ca1690658be4a04645215baea8b95f31d";
   };
 
   outputs = { self, nixpkgs }:

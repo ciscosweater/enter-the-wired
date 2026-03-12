@@ -29,6 +29,18 @@ The Enter the Wired scripts call `h3adcr-b` as part of the `slssteam` install fl
 curl -fsSL https://raw.githubusercontent.com/ciscosweater/enter-the-wired/main/enter-the-wired | bash
 ```
 
+## Nix / NixOS
+
+This repository also includes Nix files for running ACCELA in an isolated environment.
+
+```bash
+# Run ACCELA package from this repo
+nix run github:ciscosweater/enter-the-wired
+
+# Open a development shell with runtime dependencies
+nix develop github:ciscosweater/enter-the-wired
+```
+
 ## Scripts
 
 ### Linux Scripts
