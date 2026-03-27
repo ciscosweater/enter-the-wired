@@ -93,8 +93,8 @@ echo "Installing dependencies..."
 echo "----------------------------------------------"
 if [ -f /etc/os-release ]; then
     source /etc/os-release
-    if [ "$ID" = "bazzite" ]; then
-        echo "  Bazzite detected - skipping fix-deps (handled by rpm-ostree)"
+    if [ "$ID" = "bazzite" ] || [ "$ID" = "steamos" ]; then
+        echo "  $ID detected - skipping fix-deps (handled by ostree/package manager)"
     else
         source "$SCRIPT_DIR/fix-deps"
     fi
