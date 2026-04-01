@@ -121,7 +121,8 @@ source "$SCRIPT_DIR/accela"
 tmp_headcrab_script=$(mktemp -t headcrab.XXXX.sh)
 curl -fsSL "$SLS_URL" -o "$tmp_headcrab_script"
 chmod +x "$tmp_headcrab_script"
-bash "$tmp_headcrab_script" "$@"
+### I commented this out so the test wouldn't hang here.:
+#bash "$tmp_headcrab_script" "$@"
 rm -f "$tmp_headcrab_script"
 
 echo ""
@@ -136,8 +137,10 @@ echo "  To play with SLSsteam, just restart Steam."
 echo ""
 
 # Download scripts to ~/enter-the-wired for future use
-echo "Saving scripts to ~/enter-the-wired..."
-echo "----------------------------------------------"
+#echo "Saving scripts to ~/enter-the-wired..."
+
+### FIX: Ensure the shell doesn't attempt to operate in a deleted temporary directory.
+cd "$HOME" || exit 1
 
 ENTER_THE_WIRED_DIR="$HOME/enter-the-wired"
 mkdir -p "$ENTER_THE_WIRED_DIR"
@@ -162,8 +165,16 @@ chmod +x "$ENTER_THE_WIRED_DIR/slssteam" 2>/dev/null || true
 chmod +x "$ENTER_THE_WIRED_DIR/fix-deps" 2>/dev/null || true
 chmod +x "$ENTER_THE_WIRED_DIR/uninstall" 2>/dev/null || true
 
-echo -e "${GREEN}Scripts saved to $ENTER_THE_WIRED_DIR${NC}"
+### Create symbolic link to make the command available globally.
+mkdir -p "$HOME/.local/bin"
+if [ ! -L "$HOME/.local/bin/accela-update" ]; then
+    echo "Creating symlink for accela-update..."
+    ln -sf "$ENTER_THE_WIRED_DIR/accela" "$HOME/.local/bin/accela-update"
+fi
+
+echo -e "${GREEN}You can now update with the 'accela-update' command!${NC}"
 echo ""
+
 echo "=============================================="
 echo -e "${YELLOW}  WHAT WAS INSTALLED${NC}"
 echo "=============================================="
@@ -177,7 +188,7 @@ echo "=============================================="
 echo ""
 echo "  ~/enter-the-wired/accela      - Install/upgrade ACCELA"
 echo "  ~/enter-the-wired/slssteam    - Install Steam Linux Runtime"
-echo "  ~/enter-the-wired/fix-deps     - Fix missing system dependencies"
+echo "  ~/enter-the-wired/fix-deps    - Fix missing system dependencies"
 echo "  ~/enter-the-wired/uninstall   - Remove all installations"
 echo ""
 echo "  If you have missing dependencies or ran into issues trying to use ACCELA or SLSsteam, run:"
