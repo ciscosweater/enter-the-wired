@@ -12,11 +12,26 @@ let
     dotnet-runtime_9
   ];
 
+  justPlayback = pkgs.python3Packages.buildPythonPackage rec {
+    pname = "just-playback";
+    version = "0.1.8";
+    pyproject = true;
+
+    src = pkgs.fetchurl {
+      url = "https://files.pythonhosted.org/packages/a4/2d/19ffa29233196f146dd98ffcfd3751b81e43efdd6274f5fac0bdd245038d/just_playback-0.1.8.tar.gz";
+      sha256 = "sha256-5ZdHSfEPque7drPx43eaE2knWrF52HWdrifp8ptBA1A=";
+    };
+
+    build-system = with pkgs.python3Packages; [ setuptools cffi ];
+
+    dependencies = with pkgs.python3Packages; [ cffi tinytag pydub ];
+  };
+
   pythonEnv = pkgs.python3.withPackages (ps: with ps; [
     pyqt6 psutil beautifulsoup4 requests configobj cryptography 
     pillow numpy zstandard pyyaml gevent vdf urwid 
-    pycryptodomex cachetools protobuf typing-extensions setuptools cffi pygame
-  ]);
+    pycryptodomex cachetools protobuf typing-extensions setuptools cffi pygame tinytag
+  ] ++ [ justPlayback ]);
 
   desktopItem = pkgs.makeDesktopItem {
     name = "accela";
@@ -28,13 +43,13 @@ let
     terminal = false;
   };
 in
-pkgs.stdenv.mkDerivation {
+pkgs.stdenv.mkDerivation rec {
   pname = "accela";
-  version = "20260204095000";
+  version = "March";
 
   src = pkgs.fetchurl {
-    url = "https://github.com/ciscosweater/enter-the-wired/releases/download/20260204095000/ACCELA-20260204095000-linux-source.tar.gz";
-    sha256 = "sha256-PXWslicaPFX2Bf2j16DmV/Pthf5KSyxAQ0lOGbIQcYU=";
+    url = "https://github.com/LAIN616/ACCELA-DIST/releases/download/${version}/ACCELA-20260323032424-linux-source.tar.gz";
+    sha256 = "sha256-sMPcmhbHNjijmIVMp21R5A1TRGDq78YsiIcj3cEOcG8=";
   };
 
   nativeBuildInputs = [ pkgs.makeWrapper pkgs.copyDesktopItems pkgs.gnused ];
