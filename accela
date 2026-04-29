@@ -18,7 +18,7 @@ else
 fi
 
 # Configuration
-GITHUB_REPO="LAIN616/ACCELA-DIST"
+GITHUB_REPO="ciscosweater/enter-the-wired"
 INSTALL_DIR="$HOME/.local/share/ACCELA"
 
 ### global variables for cross-function communication

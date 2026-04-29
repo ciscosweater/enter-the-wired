@@ -45,11 +45,11 @@ let
 in
 pkgs.stdenv.mkDerivation rec {
   pname = "accela";
-  version = "March";
+  version = "20260425230142";
 
   src = pkgs.fetchurl {
-    url = "https://github.com/LAIN616/ACCELA-DIST/releases/download/${version}/ACCELA-20260323032424-linux-source.tar.gz";
-    sha256 = "sha256-sMPcmhbHNjijmIVMp21R5A1TRGDq78YsiIcj3cEOcG8=";
+    url = "https://github.com/ciscosweater/enter-the-wired/releases/download/${version}/ACCELA-${version}-linux-source.tar.gz";
+    sha256 = "sha256-5OPEu03XaczbrQ4iLXexE9Hd5mJN/mIhn6ByMfFOhdM=";
   };
 
   nativeBuildInputs = [ pkgs.makeWrapper pkgs.copyDesktopItems pkgs.gnused ];
