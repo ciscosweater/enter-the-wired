@@ -49,7 +49,7 @@ pkgs.stdenv.mkDerivation rec {
 
   src = pkgs.fetchurl {
     url = "https://github.com/ciscosweater/enter-the-wired/releases/download/${version}/ACCELA-${version}-linux-source.tar.gz";
-    sha256 = "sha256-5OPEu03XaczbrQ4iLXexE9Hd5mJN/mIhn6ByMfFOhdM=";
+    sha256 = "sha256-5OPEu03XaZzbDiQyLXsSw9Ed/mJN/mIhnaByMfFPhT0=";
   };
 
   nativeBuildInputs = [ pkgs.makeWrapper pkgs.copyDesktopItems pkgs.gnused ];
