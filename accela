@@ -203,7 +203,7 @@ fetch_api_data() {
     RELEASE_JSON="{
       \"tag_name\": \"$LATEST_TAG\",
       \"assets\": [
-        {\"browser_download_url\": \"$BASE/ACCELA-${LATEST_TAG}-linux-appimage.tar.gz\"},
+        {\"browser_download_url\": \"$BASE/ACCELA-${LATEST_TAG}-linux.tar.gz\"},
         {\"browser_download_url\": \"$BASE/ACCELA-${LATEST_TAG}-linux-source.tar.gz\"}
       ]
     }"
