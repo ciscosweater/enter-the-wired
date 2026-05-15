@@ -194,6 +194,10 @@ fetch_api_data() {
 }
 ###
 
+find_local_archive() {
+    find "$SCRIPT_DIR" -maxdepth 1 -name "ACCELA*.tar.gz" -type f 2>/dev/null | sort | tail -n 1 || true
+}
+
 # Fetch latest ACCELA tarball URL from GitHub API
 get_latest_release_url() {
     local release_info
@@ -214,28 +218,9 @@ install_accela() {
     local LOCAL_VERSION_FILE="$INSTALL_DIR/.version"
     local LOCAL_VERSION="None"
     local INSTALL_VERSION=""
+    local LOCAL_ARCHIVE_VERSION=""
+    local HAVE_RELEASE_METADATA=0
     [ -f "$LOCAL_VERSION_FILE" ] && LOCAL_VERSION=$(cat "$LOCAL_VERSION_FILE")
-
-    if ! fetch_api_data; then return 1; fi
-
-    if [ "$LOCAL_VERSION" == "$LATEST_TAG" ]; then
-        echo -e "${GREEN}[INFO] ACCELA is up to date (Version: $LOCAL_VERSION).${NC}"
-        ensure_accela_conf_general
-        return 0
-    fi
-
-    echo -e "\n${YELLOW}╔════════════════════════════════════════════╗"
-    echo -e "║           UPDATE AVAILABLE                 ║"
-    echo -e "╚════════════════════════════════════════════╝${NC}"
-    echo -e "  Current: ${RED}$LOCAL_VERSION${NC}"
-    echo -e "  Latest:  ${GREEN}$LATEST_TAG${NC}\n"
-
-    read -p "Do you want to proceed with the installation? [y/N] " confirm < /dev/tty
-    if [[ ! "$confirm" =~ ^[Yy]$ ]]; then
-        echo -e "\n${GREEN}[NOTE] Installation cancelled by user.${NC}"
-        return 0
-    fi
-    ###
 
     echo -e "${GREEN}Installing ACCELA...${NC}"
     echo ""
@@ -243,19 +228,61 @@ install_accela() {
     local TEMP_DIR
     local TEMP_ARCHIVE
     local EXTRACT_DIR
-    local ACCELA_URL
-    local LOCAL_ARCHIVE
+    local ACCELA_URL=""
+    local LOCAL_ARCHIVE=""
 
     TEMP_DIR="$(mktemp -d)"
     TEMP_ARCHIVE="$TEMP_DIR/accela.tar.gz"
     EXTRACT_DIR="$TEMP_DIR/extracted"
 
     ### check for local archive in the script directory
-    LOCAL_ARCHIVE=$(find "$SCRIPT_DIR" -maxdepth 1 -name "ACCELA*.tar.gz" -type f 2>/dev/null | sort | tail -n 1 || true)
+    LOCAL_ARCHIVE="$(find_local_archive)"
     ###
 
+    if [ -n "$LOCAL_ARCHIVE" ] && [[ "$(basename "$LOCAL_ARCHIVE")" =~ ^ACCELA-([0-9]+)-linux\.tar\.gz$ ]]; then
+        LOCAL_ARCHIVE_VERSION="${BASH_REMATCH[1]}"
+    fi
+
     echo "Fetching latest Linux release..."
-    ACCELA_URL=$(get_latest_release_url)
+    if fetch_api_data; then
+        HAVE_RELEASE_METADATA=1
+        ACCELA_URL=$(get_latest_release_url)
+    elif [ -z "$LOCAL_ARCHIVE" ]; then
+        rm -rf "$TEMP_DIR"
+        return 1
+    else
+        echo -e "${YELLOW}[WARN] GitHub release metadata unavailable. Falling back to local archive.${NC}"
+        LATEST_TAG="$LOCAL_ARCHIVE_VERSION"
+    fi
+
+    if [ "$HAVE_RELEASE_METADATA" -eq 1 ] && [ -n "$LATEST_TAG" ] && [ "$LOCAL_VERSION" == "$LATEST_TAG" ]; then
+        echo -e "${GREEN}[INFO] ACCELA is up to date (Version: $LOCAL_VERSION).${NC}"
+        ensure_accela_conf_general
+        rm -rf "$TEMP_DIR"
+        return 0
+    fi
+
+    echo -e "\n${YELLOW}╔════════════════════════════════════════════╗"
+    echo -e "║           UPDATE AVAILABLE                 ║"
+    echo -e "╚════════════════════════════════════════════╝${NC}"
+    echo -e "  Current: ${RED}$LOCAL_VERSION${NC}"
+    if [ "$HAVE_RELEASE_METADATA" -eq 1 ] && [ -n "$LATEST_TAG" ]; then
+        echo -e "  Latest:  ${GREEN}$LATEST_TAG${NC}\n"
+    elif [ -n "$LOCAL_ARCHIVE_VERSION" ]; then
+        echo -e "  Local:   ${GREEN}$LOCAL_ARCHIVE_VERSION${NC}"
+        echo -e "  Remote:  ${YELLOW}unavailable${NC}\n"
+    else
+        echo -e "  Remote:  ${YELLOW}unavailable${NC}"
+        echo -e "  Local:   ${GREEN}archive detected${NC}\n"
+    fi
+
+    read -p "Do you want to proceed with the installation? [y/N] " confirm < /dev/tty
+    if [[ ! "$confirm" =~ ^[Yy]$ ]]; then
+        echo -e "\n${GREEN}[NOTE] Installation cancelled by user.${NC}"
+        rm -rf "$TEMP_DIR"
+        return 0
+    fi
+    ###
 
     if [ -z "$ACCELA_URL" ] && [ -z "$LOCAL_ARCHIVE" ]; then
         echo -e "${RED}Error: Could not find download URL for ACCELA${NC}"
@@ -263,19 +290,23 @@ install_accela() {
         return 1
     fi
 
-    if [ -n "$LOCAL_ARCHIVE" ]; then
-        echo "Found local archive: $LOCAL_ARCHIVE"
-        if [[ "$(basename "$LOCAL_ARCHIVE")" =~ ^ACCELA-([0-9]+)-linux\.tar\.gz$ ]]; then
-            INSTALL_VERSION="${BASH_REMATCH[1]}"
-        fi
-        cp "$LOCAL_ARCHIVE" "$TEMP_ARCHIVE"
-    else
+    if [ -n "$ACCELA_URL" ]; then
         echo "Downloading ACCELA..."
         if ! curl -L -o "$TEMP_ARCHIVE" "$ACCELA_URL"; then
-            echo -e "${RED}Download error. Check URL or connection.${NC}"
-            rm -rf "$TEMP_DIR"
-            return 1
+            if [ -n "$LOCAL_ARCHIVE" ]; then
+                echo -e "${YELLOW}[WARN] Download failed. Falling back to local archive: $LOCAL_ARCHIVE${NC}"
+                cp "$LOCAL_ARCHIVE" "$TEMP_ARCHIVE"
+                INSTALL_VERSION="$LOCAL_ARCHIVE_VERSION"
+            else
+                echo -e "${RED}Download error. Check URL or connection.${NC}"
+                rm -rf "$TEMP_DIR"
+                return 1
+            fi
         fi
+    else
+        echo "Using local archive: $LOCAL_ARCHIVE"
+        cp "$LOCAL_ARCHIVE" "$TEMP_ARCHIVE"
+        INSTALL_VERSION="$LOCAL_ARCHIVE_VERSION"
     fi
 
     if [ -z "$INSTALL_VERSION" ]; then
