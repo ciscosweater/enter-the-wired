@@ -182,25 +182,6 @@ END {
     return 0
 }
 
-# Check if running on SteamOS (uses AppImage)
-is_steamos() {
-    if [ -f /etc/os-release ]; then
-        source /etc/os-release
-        [[ "${ID:-}" == "steamos" ]] && return 0
-    fi
-    return 1
-}
-
-# Check if running on Bazzite (uses AppImage)
-is_bazzite() {
-    if [ -f /etc/os-release ]; then
-        source /etc/os-release
-        [[ "${ID:-}" == "bazzite" ]] && return 0
-        [[ "${ID_LIKE:-}" == *"bazzite"* ]] && return 0
-    fi
-    return 1
-}
-
 ### fetch api data once and store in global variables
 fetch_api_data() {
     echo -n -e "${YELLOW}[WAIT]${NC} Fetching latest release info from GitHub... " >&2
@@ -213,33 +194,18 @@ fetch_api_data() {
 }
 ###
 
-# Fetch latest ACCELA release from GitHub API
-get_latest_release() {
-    local asset_type="$1"
+# Fetch latest ACCELA tarball URL from GitHub API
+get_latest_release_url() {
     local release_info
 
-    ### use the globally fetched json
     release_info="$RELEASE_JSON"
-    ###
 
     if [ -z "$release_info" ] || echo "$release_info" | grep -q '"message":'; then
         echo -e "${RED}Error fetching release info from GitHub API${NC}"
         return 1
     fi
 
-    # Parse the download URL based on asset type
-    case "$asset_type" in
-        source)
-            echo "$release_info" | grep -o '"browser_download_url": *"[^"]*ACCELA-[^"]*-linux-source\.tar\.gz"' | head -1 | sed 's/"browser_download_url": *"\(.*\)"/\1/'
-            ;;
-        appimage)
-            echo "$release_info" | grep -o '"browser_download_url": *"[^"]*ACCELA-[^"]*-linux-appimage\.tar\.gz"' | head -1 | sed 's/"browser_download_url": *"\(.*\)"/\1/'
-            ;;
-        *)
-            echo ""
-            return 1
-            ;;
-    esac
+    echo "$release_info" | grep -o '"browser_download_url": *"[^"]*ACCELA-[^"]*-linux\.tar\.gz"' | head -1 | sed 's/"browser_download_url": *"\(.*\)"/\1/' || true
 }
 
 # Install ACCELA
@@ -247,6 +213,7 @@ install_accela() {
     ### version check logic before installation
     local LOCAL_VERSION_FILE="$INSTALL_DIR/.version"
     local LOCAL_VERSION="None"
+    local INSTALL_VERSION=""
     [ -f "$LOCAL_VERSION_FILE" ] && LOCAL_VERSION=$(cat "$LOCAL_VERSION_FILE")
 
     if ! fetch_api_data; then return 1; fi
@@ -273,71 +240,59 @@ install_accela() {
     echo -e "${GREEN}Installing ACCELA...${NC}"
     echo ""
 
-    # Load os-release for ID detection
-    if [ -f /etc/os-release ]; then
-        source /etc/os-release
-    fi
-
-    # Install .NET SDK 9.0
-    echo -e "${GREEN}Installing .NET SDK 9.0...${NC}"
-    if ! curl -sSL https://dot.net/v1/dotnet-install.sh | bash -s -- --channel 9.0 --runtime dotnet 2>&1; then
-        echo -e "${YELLOW}Warning: .NET SDK installation failed. Continuing anyway...${NC}"
-    fi
-
-    export PATH="$HOME/.dotnet:$PATH"
-
-    # Choose URL based on distribution
+    local TEMP_DIR
     local TEMP_ARCHIVE
+    local EXTRACT_DIR
     local ACCELA_URL
     local LOCAL_ARCHIVE
 
-    # Cleanup to avoid conflicts with previous installation attempts
-    rm -rf ACCELA-*-linux-source ACCELA-*-linux-appimage 2>/dev/null || true
+    TEMP_DIR="$(mktemp -d)"
+    TEMP_ARCHIVE="$TEMP_DIR/accela.tar.gz"
+    EXTRACT_DIR="$TEMP_DIR/extracted"
 
-    if is_steamos || is_bazzite; then
-        echo "Fetching latest AppImage release for SteamOS/Bazzite..."
-        ACCELA_URL=$(get_latest_release "appimage")
-        TEMP_ARCHIVE="accela_appimage.tar.gz"
-        echo "Using AppImage..."
-    else
-        echo "Fetching latest source release..."
-        ACCELA_URL=$(get_latest_release "source")
-        TEMP_ARCHIVE="accela_source.tar.gz"
-        echo "Using source build..."
-    fi
+    ### check for local archive in the script directory
+    LOCAL_ARCHIVE=$(find "$SCRIPT_DIR" -maxdepth 1 -name "ACCELA*.tar.gz" -type f 2>/dev/null | sort | tail -n 1 || true)
+    ###
 
-    if [ -z "$ACCELA_URL" ]; then
+    echo "Fetching latest Linux release..."
+    ACCELA_URL=$(get_latest_release_url)
+
+    if [ -z "$ACCELA_URL" ] && [ -z "$LOCAL_ARCHIVE" ]; then
         echo -e "${RED}Error: Could not find download URL for ACCELA${NC}"
+        rm -rf "$TEMP_DIR"
         return 1
     fi
 
-    ### check for local archive in the script directory
-    LOCAL_ARCHIVE=$(find "$SCRIPT_DIR" -maxdepth 1 -name "ACCELA*.tar.gz" -type f 2>/dev/null | head -1 || true)
-    ###
-
     if [ -n "$LOCAL_ARCHIVE" ]; then
         echo "Found local archive: $LOCAL_ARCHIVE"
-        TEMP_ARCHIVE="$LOCAL_ARCHIVE"
+        if [[ "$(basename "$LOCAL_ARCHIVE")" =~ ^ACCELA-([0-9]+)-linux\.tar\.gz$ ]]; then
+            INSTALL_VERSION="${BASH_REMATCH[1]}"
+        fi
+        cp "$LOCAL_ARCHIVE" "$TEMP_ARCHIVE"
     else
         echo "Downloading ACCELA..."
         if ! curl -L -o "$TEMP_ARCHIVE" "$ACCELA_URL"; then
             echo -e "${RED}Download error. Check URL or connection.${NC}"
-            rm -f "$TEMP_ARCHIVE" 2>/dev/null
+            rm -rf "$TEMP_DIR"
             return 1
         fi
+    fi
+
+    if [ -z "$INSTALL_VERSION" ]; then
+        INSTALL_VERSION="$LATEST_TAG"
     fi
 
     # Verify download was successful (minimum 1KB)
     if [ ! -f "$TEMP_ARCHIVE" ]; then
         echo -e "${RED}Error: Download failed or file is empty.${NC}"
-        rm -f "$TEMP_ARCHIVE" 2>/dev/null
+        rm -rf "$TEMP_DIR"
         return 1
     fi
 
     local FILE_SIZE=$(stat -c%s "$TEMP_ARCHIVE" 2>/dev/null || stat -f%z "$TEMP_ARCHIVE" 2>/dev/null || echo 0)
     if [ "$FILE_SIZE" -lt 1024 ]; then
         echo -e "${RED}Error: Downloaded file is too small (corrupted).${NC}"
-        rm -f "$TEMP_ARCHIVE" 2>/dev/null
+        rm -rf "$TEMP_DIR"
         return 1
     fi
 
@@ -347,55 +302,43 @@ install_accela() {
     rm -rf "$INSTALL_DIR"/*
 
     echo "Extracting archive..."
-    ### use a temporary build directory for extraction
-    local BUILD_DIR=$(mktemp -d)
-    if ! tar -xzf "$TEMP_ARCHIVE" -C "$BUILD_DIR"; then
+    mkdir -p "$EXTRACT_DIR"
+    if ! tar -xzf "$TEMP_ARCHIVE" -C "$EXTRACT_DIR"; then
         echo -e "${RED}Error extracting archive. Download may be corrupted.${NC}"
-        rm -f "$TEMP_ARCHIVE" 2>/dev/null
-        rm -rf "$BUILD_DIR"
+        rm -rf "$TEMP_DIR"
         return 1
     fi
-    [ -z "$LOCAL_ARCHIVE" ] && rm "$TEMP_ARCHIVE"
 
-    if ! cd "$BUILD_DIR"; then
-        echo -e "${RED}Error: Could not access temporary build directory${NC}"
+    if ! cd "$EXTRACT_DIR"; then
+        echo -e "${RED}Error: Could not access temporary extraction directory${NC}"
+        rm -rf "$TEMP_DIR"
         return 1
     fi
-    ###
 
     echo "Making installer executable..."
     if [ -f "./ACCELAINSTALL" ]; then
         chmod +x ./ACCELAINSTALL
 
         echo -e "${GREEN}Running ACCELAINSTALL...${NC}"
-        export SKIPVENV="${SKIPVENV:-0}"
         if ! ./ACCELAINSTALL; then
             echo -e "${RED}Error running ACCELAINSTALL.${NC}"
-            ### cleanup build dir even on failure
-            rm -rf "$BUILD_DIR"
-            ###
+            rm -rf "$TEMP_DIR"
             return 1
         fi
-        ### persist version info after successful run
-        echo "$LATEST_TAG" > "$LOCAL_VERSION_FILE"
+        echo "$INSTALL_VERSION" > "$LOCAL_VERSION_FILE"
         ensure_accela_conf_general
-        ###
     else
         echo -e "${RED}Error: 'ACCELAINSTALL' not found in extracted folder.${NC}"
         ls -la
-        ### cleanup
-        rm -rf "$BUILD_DIR"
-        ###
+        rm -rf "$TEMP_DIR"
         return 1
     fi
 
     # Clean up installer directory
     echo "Cleaning up temporary files..."
-    ### remove the temporary build directory
-    rm -rf "$BUILD_DIR"
-    ###
+    rm -rf "$TEMP_DIR"
 
-    echo -e "${GREEN}[INFO] ACCELA $LATEST_TAG installed successfully!${NC}"
+    echo -e "${GREEN}[INFO] ACCELA $INSTALL_VERSION installed successfully!${NC}"
     return 0
 }
 
