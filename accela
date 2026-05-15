@@ -204,11 +204,29 @@ is_bazzite() {
 ### fetch api data once and store in global variables
 fetch_api_data() {
     echo -n -e "${YELLOW}[WAIT]${NC} Fetching latest release info from GitHub... " >&2
-    if ! RELEASE_JSON=$(curl -f -sSL --connect-timeout 10 "https://api.github.com/repos/$GITHUB_REPO/releases/latest" 2>/dev/null); then
+
+    # use github.com redirect instead of api.github.com (unreachable on some ISPs/routes)
+    local REDIRECT_URL
+    REDIRECT_URL=$(curl -sSL --connect-timeout 15 --max-time 30 \
+        -o /dev/null -w "%{url_effective}" \
+        "https://github.com/$GITHUB_REPO/releases/latest" 2>/dev/null)
+
+    if [ -z "$REDIRECT_URL" ] || [[ "$REDIRECT_URL" == *"/releases/latest"* ]]; then
         echo -e "${RED}FAILED${NC}" >&2
         return 1
     fi
-    LATEST_TAG=$(echo "$RELEASE_JSON" | grep -m 1 '"tag_name":' | sed -E 's/.*"tag_name": *"([^"]+)".*/\1/')
+
+    LATEST_TAG="${REDIRECT_URL##*/}"
+
+    local BASE="https://github.com/$GITHUB_REPO/releases/download/$LATEST_TAG"
+    RELEASE_JSON="{
+      \"tag_name\": \"$LATEST_TAG\",
+      \"assets\": [
+        {\"browser_download_url\": \"$BASE/ACCELA-${LATEST_TAG}-linux-appimage.tar.gz\"},
+        {\"browser_download_url\": \"$BASE/ACCELA-${LATEST_TAG}-linux-source.tar.gz\"}
+      ]
+    }"
+
     echo -e "${GREEN}DONE!${NC}" >&2
 }
 ###
