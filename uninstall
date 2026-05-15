@@ -143,14 +143,7 @@ cleanup_slssteam() {
 
     local autostart_file="$HOME/.config/autostart/steam.desktop"
 
-    ### forced removal of all annoying leftovers and localized desktops
-    rm -f "$HOME/.local/share/applications/steam.desktop"
-    rm -f "$HOME/.local/share/applications/accela.desktop"
-    rm -f "$HOME/.local/share/applications/ACCELA.desktop"
-    rm -f "$HOME/.local/share/accela.desktop"
-    rm -f "$HOME/.local/bin/accela-update"
-    rm -f "$HOME/.local/bin/accela"
-
+    ### localized desktop shortcut cleanup
     local desktop_folders=("$HOME/Desktop" "$HOME/Área de Trabalho" "$(xdg-user-dir DESKTOP 2>/dev/null || echo "$HOME/Desktop")")
     for folder in "${desktop_folders[@]}"; do
         if [ -d "$folder" ]; then
@@ -158,11 +151,31 @@ cleanup_slssteam() {
         fi
     done
 
-    # Remove ACCELA and SLSsteam directories
+    ### files and shortcuts to remove conditionally
+    local files_to_remove=(
+        "$HOME/.local/share/applications/steam.desktop"
+        "$HOME/.local/share/applications/accela.desktop"
+        "$HOME/.local/share/applications/ACCELA.desktop"
+        "$HOME/.local/share/accela.desktop"
+        "$HOME/.local/bin/accela"
+        "$HOME/.local/share/applications/headcrab.desktop"
+    )
+
+    for file in "${files_to_remove[@]}"; do
+        if [ -f "$file" ]; then
+            rm -f "$file"
+            echo "  Removed file: $file"
+        fi
+    done
+
+    ### remove specific project and environment directories
     local dirs_to_remove=(
         "$HOME/.local/share/ACCELA"
         "$HOME/.local/share/SLSsteam"
         "$HOME/.config/SLSsteam"
+        "$HOME/.local/share/CloudRedirect"
+        "$HOME/.config/CloudRedirect"
+        "$HOME/enter-the-wired"
         "$HOME/.var/app/com.valvesoftware.Steam/.local/share/SLSsteam"
         "$HOME/.var/app/com.valvesoftware.Steam/.config/SLSsteam"
     )
@@ -170,7 +183,7 @@ cleanup_slssteam() {
     for dir in "${dirs_to_remove[@]}"; do
         if [ -d "$dir" ]; then
             rm -rf "$dir"
-            echo "  Removed: $dir"
+            echo "  Removed directory: $dir"
         fi
     done
 
