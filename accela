@@ -201,12 +201,11 @@ fetch_api_data() {
 
     local BASE="https://github.com/$GITHUB_REPO/releases/download/$LATEST_TAG"
     RELEASE_JSON="{
-      \"tag_name\": \"$LATEST_TAG\",
-      \"assets\": [
-        {\"browser_download_url\": \"$BASE/ACCELA-${LATEST_TAG}-linux-appimage.tar.gz\"},
-        {\"browser_download_url\": \"$BASE/ACCELA-${LATEST_TAG}-linux-source.tar.gz\"}
-      ]
-    }"
+          \"tag_name\": \"$LATEST_TAG\",
+          \"assets\": [
+            {\"browser_download_url\": \"$BASE/ACCELA-${LATEST_TAG}-linux.tar.gz\"}
+          ]
+        }"
 
     echo -e "${GREEN}DONE!${NC}" >&2
 }
