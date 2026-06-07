@@ -6,27 +6,38 @@
     nixpkgs.url = "github:NixOS/nixpkgs/9dcb002ca1690658be4a04645215baea8b95f31d";
   };
 
-  outputs = { self, nixpkgs }:
+  outputs =
+    { self, nixpkgs }:
     let
       supportedSystems = [ "x86_64-linux" ];
       forAllSystems = nixpkgs.lib.genAttrs supportedSystems;
-      nixpkgsFor = forAllSystems (system: import nixpkgs { inherit system; config.allowUnfree = true; });
+      nixpkgsFor = forAllSystems (
+        system:
+        import nixpkgs {
+          inherit system;
+          config.allowUnfree = true;
+        }
+      );
     in
     {
-      packages = forAllSystems (system:
+      packages = forAllSystems (
+        system:
         let
           pkgs = nixpkgsFor.${system};
         in
         {
-          default = import ./default.nix { inherit pkgs; };
-        });
+          default = pkgs.callPackage ./default.nix { };
+        }
+      );
 
-      devShells = forAllSystems (system:
+      devShells = forAllSystems (
+        system:
         let
           pkgs = nixpkgsFor.${system};
         in
         {
           default = import ./shell.nix { inherit pkgs; };
-        });
+        }
+      );
     };
 }

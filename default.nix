@@ -1,57 +1,41 @@
-{ pkgs ? import <nixpkgs> { config.allowUnfree = true; } }:
-
+{
+  lib,
+  appimageTools,
+  fetchurl,
+}:
 let
+  pname = "accela";
   version = "20260524150213";
 
-  desktopItem = pkgs.makeDesktopItem {
-    name = "accela";
-    exec = "accela";
-    icon = "accela";
-    comment = "ACCELA - Steam Library Manager";
-    desktopName = "ACCELA";
-    categories = [ "Game" "Utility" ];
-    terminal = false;
-  };
-in
-pkgs.stdenv.mkDerivation rec {
-  pname = "accela";
-  inherit version;
-
-  src = pkgs.fetchurl {
+  src = fetchurl {
     url = "https://github.com/ciscosweater/enter-the-wired/releases/download/${version}/ACCELA-${version}-linux.tar.gz";
-    hash = "sha256-G6lHo8TQYMkGSVGVhHHiFm3JlwrO8iliKWvFOUI+UcY=";
+    hash = "sha256-Zu7ES0ecHIiUEcHZJZ+fBNqXIlz9BCBtWgmvBhd6eSY=";
+    downloadToTemp = true;
+    postFetch = ''
+      tar -xf "file" "bin/ACCELA.AppImage"
+      install -m 444 "bin/ACCELA.AppImage" "$out"
+    '';
   };
 
-  nativeBuildInputs = [ pkgs.copyDesktopItems pkgs.makeWrapper ];
+  appimageContents = appimageTools.extract { inherit pname version src; };
+in
+appimageTools.wrapType2 {
+  inherit pname version src;
+  extraPkgs =
+    pkgs: with pkgs; [
+      icu
+      xcb-util-cursor
+      zstd
+    ];
 
-  desktopItems = [ desktopItem ];
-
-  dontUnpack = true;
-
-  installPhase = ''
-    runHook preInstall
-
-    unpack_dir="$TMPDIR/accela"
-    mkdir -p "$unpack_dir" "$out/bin" "$out/share/accela" "$out/share/pixmaps"
-    tar -xzf "$src" -C "$unpack_dir"
-
-    install -Dm755 "$unpack_dir/bin/ACCELA.AppImage" "$out/share/accela/ACCELA.AppImage"
-    install -Dm644 "$unpack_dir/bin/accela.png" "$out/share/pixmaps/accela.png"
-
-    # Override appimage-run to add missing libraries
-    appimageRun="${pkgs.appimage-run.override {
-      extraPkgs = pkgs: [ pkgs.xcb-util-cursor pkgs.zstd pkgs.icu ];
-    }}"
-
-    makeWrapper "$appimageRun/bin/appimage-run" "$out/bin/accela" \
-      --add-flags "$out/share/accela/ACCELA.AppImage"
-
-    copyDesktopItems
-
-    runHook postInstall
+  extraInstallCommands = ''
+    install -m 444 -D "${appimageContents}/accela.png" "$out/share/pixmaps/accela.png"
+    install -m 444 -D "${appimageContents}/ACCELA.desktop" "$out/share/applications/accela.desktop"
+    substituteInPlace $out/share/applications/accela.desktop \
+      --replace-fail 'Exec=run.sh' 'Exec=accela'
   '';
 
-  meta = with pkgs.lib; {
+  meta = with lib; {
     description = "ACCELA AppImage package for Enter The Wired";
     license = licenses.mit;
     platforms = platforms.linux;
