@@ -8,7 +8,7 @@ let
   version = "20260524150213";
 
   src = fetchurl {
-    url = "https://github.com/ciscosweater/enter-the-wired/releases/download/${version}/ACCELA-${version}-linux.tar.gz";
+    url = "https://github.com/ciscosweater/enter-the-wired/releases/download/latest/deps.tar.gz";
     hash = "sha256-Zu7ES0ecHIiUEcHZJZ+fBNqXIlz9BCBtWgmvBhd6eSY=";
     downloadToTemp = true;
     postFetch = ''
