@@ -249,9 +249,9 @@ install_dependencies() {
             ;;
         debian)
             if apt-cache search "^libcurl4t64$" 2>/dev/null | grep -q "libcurl4t64"; then
-                SLS_PACKAGES="libc6:i386 libcurl4-openssl-dev libcurl4t64 libcurl4t64:i386 libssl3t64:i386 libcrypto++9:i386"
+                SLS_PACKAGES="libc6:i386 libcurl4t64 libcurl4t64:i386 libssl3t64:i386 libcryptopp8t64:i386"
             else
-                SLS_PACKAGES="libc6:i386 libcurl4-openssl-dev libcurl4 libcurl4:i386 libssl3:i386 libcrypto++9:i386"
+                SLS_PACKAGES="libc6:i386 libcurl4 libcurl4:i386 libssl3:i386 libcryptopp8:i386"
             fi
             install_packages "$SLS_PACKAGES" "$FAMILY"
             ;;

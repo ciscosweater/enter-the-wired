@@ -187,7 +187,21 @@ END {
 fetch_api_data() {
     echo -n -e "${YELLOW}[WAIT]${NC} Fetching latest release info from GitHub... " >&2
 
-    # use github.com redirect instead of api.github.com (unreachable on some ISPs/routes)
+    # 1. Try GitHub API first (most accurate)
+    local API_URL="https://api.github.com/repos/$GITHUB_REPO/releases/latest"
+    local API_RES
+    if API_RES=$(curl -sSL --retry 3 --retry-delay 2 --connect-timeout 10 --max-time 15 "$API_URL" 2>/dev/null) && [ -n "$API_RES" ] && ! echo "$API_RES" | grep -q '"message":'; then
+        LATEST_TAG=$(echo "$API_RES" | grep -o '"tag_name": *"[^"]*"' | head -1 | sed 's/"tag_name": *"\(.*\)"/\1/' || true)
+        local ACTUAL_URL
+        ACTUAL_URL=$(echo "$API_RES" | grep -o '"browser_download_url": *"[^"]*ACCELA-[^"]*-linux\.tar\.gz"' | head -1 | sed 's/"browser_download_url": *"\(.*\)"/\1/' || true)
+        if [ -n "$ACTUAL_URL" ] && [ -n "$LATEST_TAG" ]; then
+            RELEASE_JSON="$API_RES"
+            echo -e "${GREEN}DONE!${NC}" >&2
+            return 0
+        fi
+    fi
+
+    # 2. Fallback: use github.com redirect instead of api.github.com (unreachable on some ISPs/routes)
     local REDIRECT_URL
     REDIRECT_URL=$(curl -sSL --retry 3 --retry-delay 2 --connect-timeout 15 --max-time 30 \
         -o /dev/null -w "%{url_effective}" \
@@ -200,11 +214,29 @@ fetch_api_data() {
 
     LATEST_TAG="${REDIRECT_URL##*/}"
 
+    # Try to find the exact asset name using the expanded_assets HTML page
+    local ASSET_HTML
+    local ASSET_NAME=""
+    if ASSET_HTML=$(curl -sSL --retry 3 --retry-delay 2 --connect-timeout 10 --max-time 15 \
+        "https://github.com/$GITHUB_REPO/releases/expanded_assets/$LATEST_TAG" 2>/dev/null) && [ -n "$ASSET_HTML" ]; then
+        ASSET_NAME=$(echo "$ASSET_HTML" | grep -o 'ACCELA-[^"]*-linux\.tar\.gz' | head -1 || true)
+    fi
+
+    # If expanded_assets scraping failed, check if LATEST_TAG starts with fork-
+    # and construct the most likely candidate name.
+    if [ -z "$ASSET_NAME" ]; then
+        if [[ "$LATEST_TAG" == fork-* ]]; then
+            ASSET_NAME="ACCELA-${LATEST_TAG}-linux.tar.gz"
+        else
+            ASSET_NAME="ACCELA-fork-${LATEST_TAG}-linux.tar.gz"
+        fi
+    fi
+
     local BASE="https://github.com/$GITHUB_REPO/releases/download/$LATEST_TAG"
     RELEASE_JSON="{
           \"tag_name\": \"$LATEST_TAG\",
           \"assets\": [
-            {\"browser_download_url\": \"$BASE/ACCELA-${LATEST_TAG}-linux.tar.gz\"}
+            {\"browser_download_url\": \"$BASE/$ASSET_NAME\"}
           ]
         }"
 
