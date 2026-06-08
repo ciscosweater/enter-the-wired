@@ -257,7 +257,7 @@ install_accela() {
     LOCAL_ARCHIVE="$(find_local_archive)"
     ###
 
-    if [ -n "$LOCAL_ARCHIVE" ] && [[ "$(basename "$LOCAL_ARCHIVE")" =~ ^ACCELA-([0-9]+)-linux\.tar\.gz$ ]]; then
+    if [ -n "$LOCAL_ARCHIVE" ] && [[ "$(basename "$LOCAL_ARCHIVE")" =~ ^ACCELA-(.+)-linux\.tar\.gz$ ]]; then
         LOCAL_ARCHIVE_VERSION="${BASH_REMATCH[1]}"
     fi
 
