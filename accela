@@ -319,6 +319,11 @@ install_accela() {
                 INSTALL_VERSION="$LOCAL_ARCHIVE_VERSION"
             else
                 echo -e "${RED}Download error. Check URL or connection.${NC}"
+                echo ""
+                echo "  If you see a TLS error (curl: 35), your DNS may be intercepting"
+                echo "  GitHub release assets. Try switching to a public DNS:"
+                echo "    sudo resolvectl dns <interface> 8.8.8.8 8.8.4.4"
+                echo "  (AdGuard DNS 94.140.14.14 is known to break TLS to release-assets.githubusercontent.com)"
                 rm -rf "$TEMP_DIR"
                 return 1
             fi
